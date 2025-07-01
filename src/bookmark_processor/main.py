@@ -1,220 +1,215 @@
-import sys
 from pathlib import Path
 from typing import Optional, Set
 
 import typer
-from prefect import flow, task
-from prefect.tasks import task_input_hash
-from prefect_selenium import SeleniumWebDriver
-from prefect_selenium.tasks import open_webpage, get_page_content
+from prefect import flow, get_run_logger
 
-from .models import Bookmark, LivenessResult
-from .tasks.io import load_bookmarks, save_results
-from .tasks.liveness import attempt_get_request, attempt_headless_browser
-from .tasks.processing import (
-    load_blessed_tags,
+from models import Bookmark, LivenessResult
+from tasks.io import load_bookmarks, save_results
+from tasks.liveness import (
+    attempt_get_request,
+    attempt_headless_browser,
+)
+from tasks.processing import (
     extract_main_content,
     lint_tags,
-    summarize_content,
+    load_blessed_tags, # Added import
     suggest_tags,
+    summarize_content,
 )
 
 app = typer.Typer()
 
 
 def _perform_get_check(url: str) -> Optional[LivenessResult]:
-    """Performs a GET request check for URL liveness."""
+    """Attempts a GET request and returns LivenessResult if successful."""
+    logger = get_run_logger()
     try:
-        response_data = attempt_get_request.submit(url).result()
-        if response_data:
+        logger.info(f"Attempting GET request for {url}")
+        get_result = attempt_get_request(url)
+        if get_result:
+            logger.info(f"GET success for {url}, status: {get_result['status_code']}")
             return LivenessResult(
+                url=url,
                 is_live=True,
-                status_code=response_data.get("status_code"),
-                content_type=response_data.get("content_type"),
-                html_content=response_data.get("html_content"),
-                error_message=None,
-                check_method="GET",
+                status_code=get_result["status_code"],
+                method="GET",
+                final_url=get_result["final_url"],
+                content=get_result["content"],
             )
     except Exception as e:
-        return LivenessResult(
-            is_live=False,
-            status_code=None,
-            content_type=None,
-            html_content=None,
-            error_message=str(e),
-            check_method="GET",
-        )
+        logger.warning(f"GET request failed for {url}: {e}")
     return None
 
 
 def _perform_headless_check(url: str) -> Optional[LivenessResult]:
-    """Performs a headless browser check for URL liveness."""
+    """Attempts a headless browser check and returns LivenessResult if successful."""
+    logger = get_run_logger()
     try:
-        with SeleniumWebDriver(browser="chrome") as driver:
-            open_webpage.submit(driver, url).result()
-            html_content = get_page_content.submit(driver).result()
-            if html_content:
-                return LivenessResult(
-                    is_live=True,
-                    status_code=200,  # Assume 200 if content is retrieved
-                    content_type="text/html",
-                    html_content=html_content,
-                    error_message=None,
-                    check_method="HEADLESS",
-                )
+        logger.info(f"Attempting headless browser for {url}")
+        headless_result = attempt_headless_browser(url)
+        if headless_result:
+            logger.info(f"Headless browser success for {url}, status: {headless_result['status_code']}")
+            return LivenessResult(
+                url=url,
+                is_live=True,
+                status_code=headless_result["status_code"],
+                method="HEADLESS",
+                final_url=headless_result["final_url"],
+                content=headless_result["content"],
+            )
     except Exception as e:
-        return LivenessResult(
-            is_live=False,
-            status_code=None,
-            content_type=None,
-            html_content=None,
-            error_message=str(e),
-            check_method="HEADLESS",
-        )
+        logger.warning(f"Headless browser failed for {url}: {e}")
     return None
 
 
 @flow(name="Check URL Liveness")
 def liveness_flow(url: str) -> LivenessResult:
     """
-    Checks the liveness of a URL, first with a GET request, then with a headless browser if needed.
+    Checks the liveness of a given URL using a fallback chain: GET -> Headless.
     """
-    typer.echo(f"Checking liveness for: {url}")
-    get_result = _perform_get_check(url)
-    if get_result and get_result.is_live:
-        typer.echo(f"  GET check successful (Status: {get_result.status_code})")
-        return get_result
+    logger = get_run_logger()
 
-    typer.echo("  GET check failed or inconclusive, attempting headless browser...")
-    headless_result = _perform_headless_check(url)
-    if headless_result and headless_result.is_live:
-        typer.echo("  Headless browser check successful.")
-        return headless_result
+    # Attempt GET request first
+    get_check_result = _perform_get_check(url)
+    if get_check_result:
+        return get_check_result
 
-    typer.echo("  Both liveness checks failed.")
-    return headless_result or get_result or LivenessResult(is_live=False, error_message="All liveness checks failed.")
+    # Attempt headless browser
+    headless_check_result = _perform_headless_check(url)
+    if headless_check_result:
+        return headless_check_result
+
+    logger.error(f"All liveness checks failed for URL: {url}")
+    return LivenessResult(
+        url=url,
+        is_live=False,
+        status_code=None,
+        method="NONE",
+        final_url=None,
+        content=None,
+    )
 
 
 def _get_and_extract_content_source(bookmark: Bookmark, liveness_result: LivenessResult) -> Optional[str]:
-    """
-    Extracts the main content from the liveness result's HTML content.
-    """
-    if liveness_result and liveness_result.is_live and liveness_result.html_content:
-        typer.echo(f"  Extracting main content for {bookmark.url}...")
-        return extract_main_content.submit(liveness_result.html_content).result()
-    return None
+    """Determines the primary text source for processing (extended, fetched HTML, or direct GET)."""
+    logger = get_run_logger()
+    text_source = None
+    if bookmark.extended:
+        text_source = bookmark.extended
+        logger.info("Using existing 'extended' description as text source.")
+    elif liveness_result.content:
+        logger.info("Extracting main content from fetched HTML via liveness check.")
+        text_source = extract_main_content(liveness_result.content)
+    else:
+        logger.warning(
+            f"No content available from liveness check for {bookmark.href}. Attempting direct GET to fetch content."
+        )
+        try:
+            get_result = attempt_get_request(bookmark.href)
+            if get_result and get_result["content"]:
+                text_source = extract_main_content(get_result["content"])
+                logger.info(f"Direct GET successful for {bookmark.href}.")
+            else:
+                logger.warning(f"Direct GET failed to retrieve content for {bookmark.href}.")
+        except Exception as e:
+            logger.error(f"Error during direct GET for {bookmark.href}: {e}")
+    return text_source
 
 
 def _summarize_and_update_extended(bookmark: Bookmark, text_source: Optional[str]) -> None:
-    """
-    Summarizes the content and updates the bookmark's extended_description.
-    """
-    if text_source:
-        typer.echo(f"  Summarizing content for {bookmark.url}...")
-        summary = summarize_content.submit(text_source).result()
-        if summary:
-            bookmark.extended_description = summary
-            typer.echo("  Extended description updated.")
-        else:
-            typer.echo("  Failed to generate summary.")
+    """Summarizes content and updates bookmark.extended if conditions are met."""
+    logger = get_run_logger()
+    if text_source and not bookmark.extended:
+        logger.info("Summarizing content for 'extended' description.")
+        summary = summarize_content(text_source)
+        bookmark.extended = summary
 
 
 def _suggest_and_add_new_tags(bookmark: Bookmark, text_source: Optional[str]) -> None:
-    """
-    Suggests new tags based on content and adds them to the bookmark.
-    """
+    """Suggests new tags based on content and adds them to the bookmark."""
+    logger = get_run_logger()
     if text_source:
-        typer.echo(f"  Suggesting new tags for {bookmark.url}...")
-        suggested_tags = suggest_tags.submit(text_source).result()
-        if suggested_tags:
-            # Add suggested tags, avoiding duplicates
-            current_tags_set = set(bookmark.tags)
-            new_tags_added = False
-            for tag in suggested_tags:
-                if tag not in current_tags_set:
-                    bookmark.tags.append(tag)
-                    current_tags_set.add(tag)
-                    new_tags_added = True
-            if new_tags_added:
-                typer.echo(f"  Added new tags: {', '.join(suggested_tags)}")
-            else:
-                typer.echo("  No new tags suggested or all already present.")
-        else:
-            typer.echo("  Failed to suggest tags.")
+        logger.info("Suggesting new tags.")
+        new_tags = suggest_tags(text_source)
+        all_tags = set(bookmark.tags)
+        all_tags.update(new_tags)
+        bookmark.tags = sorted(list(all_tags))
+        logger.info(f"Added new tags for {bookmark.href}: {new_tags}")
 
 
-def _lint_and_filter_tags(bookmark: Bookmark, blessed_tags_set: Set[str]) -> None:
-    """
-    Lints and filters tags based on a blessed list.
-    """
-    if blessed_tags_set:
-        original_tags = set(bookmark.tags)
-        typer.echo(f"  Linting tags for {bookmark.url}...")
-        linted_tags = lint_tags.submit(bookmark.tags, blessed_tags_set).result()
-        bookmark.tags = linted_tags
-        removed_tags = original_tags - set(linted_tags)
-        if removed_tags:
-            typer.echo(f"  Removed unblessed tags: {', '.join(removed_tags)}")
-        else:
-            typer.echo("  No unblessed tags found.")
-    else:
-        typer.echo("  No blessed tags provided for linting.")
+def _lint_and_filter_tags(bookmark: Bookmark, blessed_tags_set: Set[str]) -> None: # Modified signature
+    """Lints existing tags and removes unblessed ones."""
+    logger = get_run_logger()
+    initial_tags = bookmark.tags
+    bookmark.tags = lint_tags(bookmark.tags, blessed_tags_set) # Passed blessed_tags_set
+    removed_tags = set(initial_tags) - set(bookmark.tags)
+    if removed_tags:
+        logger.info(f"Removed unblessed tags for {bookmark.href}: {list(removed_tags)}")
 
 
 @flow(name="Process Single Bookmark")
-def process_bookmark_flow(bookmark: Bookmark, blessed_tags_set: Set[str]) -> Bookmark:
+def process_bookmark_flow(bookmark: Bookmark, blessed_tags_set: Set[str]) -> Bookmark: # Modified signature
     """
-    Processes a single bookmark: checks liveness, extracts content, summarizes,
-    suggests tags, and lints tags.
+    Processes a single bookmark: checks liveness, extracts content, summarizes, and suggests tags.
     """
-    typer.echo(f"\nProcessing bookmark: {bookmark.title} ({bookmark.url})")
+    logger = get_run_logger()
+    logger.info(f"Processing bookmark: {bookmark.href}")
 
     # 1. Check URL Liveness
-    liveness_result = liveness_flow(bookmark.url)
-    bookmark.liveness = liveness_result
+    liveness_result = liveness_flow(bookmark.href)
+
+    # Update bookmark href to final URL if redirect occurred
+    if liveness_result.final_url and liveness_result.final_url != bookmark.href:
+        logger.info(f"URL {bookmark.href} redirected to {liveness_result.final_url}")
+        bookmark.href = liveness_result.final_url
 
     if not liveness_result.is_live:
-        typer.echo(f"  Bookmark {bookmark.url} is not live. Skipping content processing.")
+        logger.warning(f"Bookmark {bookmark.href} is not live. Skipping content processing.")
+        # Even if not live, we still want to lint tags and save the bookmark
+        _lint_and_filter_tags(bookmark, blessed_tags_set) # Passed blessed_tags_set
+        # Append "not-live" tag for bookmarks that failed all liveness checks
+        bookmark.tags.append("not-live")
         return bookmark
 
-    # 2. Get and Extract Content Source
+    # 2. Determine and extract text source for processing
     text_source = _get_and_extract_content_source(bookmark, liveness_result)
 
-    # 3. Summarize and Update Extended Description
+    # 3. Summarize Content
     _summarize_and_update_extended(bookmark, text_source)
 
-    # 4. Suggest and Add New Tags
+    # 4. Suggest and add new Tags
     _suggest_and_add_new_tags(bookmark, text_source)
 
-    # 5. Lint and Filter Tags
-    _lint_and_filter_tags(bookmark, blessed_tags_set)
+    # 5. Lint Tags
+    _lint_and_filter_tags(bookmark, blessed_tags_set) # Passed blessed_tags_set
 
-    typer.echo(f"Finished processing bookmark: {bookmark.title}")
+    logger.info(f"Finished processing bookmark: {bookmark.href}")
     return bookmark
 
 
 @flow(name="Process All Bookmarks")
 def process_all_bookmarks_flow(bookmarks_filepath: str, output_filepath: str):
     """
-    Main flow to load, process, and save bookmarks.
+    Orchestrates the entire bookmark processing pipeline.
     """
-    typer.echo(f"Loading bookmarks from {bookmarks_filepath}...")
-    bookmarks_data = load_bookmarks.submit(bookmarks_filepath).result()
-    bookmarks = [Bookmark(**data) for data in bookmarks_data]
-    typer.echo(f"Loaded {len(bookmarks)} bookmarks.")
+    logger = get_run_logger()
 
-    typer.echo("Loading blessed tags...")
-    blessed_tags_set = load_blessed_tags.submit().result()
-    typer.echo(f"Loaded {len(blessed_tags_set)} blessed tags.")
+    logger.info(f"Reading bookmarks from {bookmarks_filepath}")
+    data = load_bookmarks(bookmarks_filepath)
+    bookmarks = [Bookmark.model_validate(item) for item in data]
+    logger.info(f"Found {len(bookmarks)} bookmarks to process.")
 
-    processed_bookmarks = []
-    for bookmark in bookmarks:
-        processed_bookmark = process_bookmark_flow(bookmark, blessed_tags_set)
-        processed_bookmarks.append(processed_bookmark)
+    # Load blessed tags once
+    blessed_tags_set = load_blessed_tags("blessed_tags.txt") # Loaded once
 
-    typer.echo(f"\nSaving processed bookmarks to {output_filepath}...")
-    save_results.submit(processed_bookmarks, output_filepath).result()
-    typer.echo("Processing complete!")
+    # Process each bookmark as a subflow.
+    # With the default SequentialTaskRunner, these will run one after another.
+    results = [process_bookmark_flow(b, blessed_tags_set) for b in bookmarks] # Passed blessed_tags_set
+    logger.info("All subflows completed.")
+
+    logger.info(f"Saving {len(results)} processed bookmarks to {output_filepath}")
+    save_results(results, output_filepath)
 
 
 @app.command()
@@ -229,20 +224,18 @@ def run(
         help="The path to the input JSON file containing the bookmarks.",
     ),
     output_file: Path = typer.Argument(
-        "processed_bookmarks.json",
+        ...,
         file_okay=True,
         dir_okay=False,
         writable=True,
         resolve_path=True,
-        help="The path to save the processed bookmarks JSON file.",
+        help="The path where the output JSON file will be saved.",
     ),
 ):
     """
-    Runs the bookmark processing flow.
+    Process a list of bookmarks to check for liveness, lint tags, and enrich content.
     """
-    typer.echo("Starting bookmark processing...")
     process_all_bookmarks_flow(str(input_file), str(output_file))
-    typer.echo("Bookmark processing finished.")
 
 
 if __name__ == "__main__":

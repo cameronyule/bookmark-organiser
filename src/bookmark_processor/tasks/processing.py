@@ -1,82 +1,113 @@
-import os
-from typing import List, Set
 from datetime import timedelta
+from typing import List, Set
+
+import llm
+from bs4 import BeautifulSoup
 from prefect import task
 from prefect.tasks import task_input_hash
-
-from bs4 import BeautifulSoup
-from readability import Document
-
-from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
-from langchain.schema import StrOutputParser
-from langchain.schema.runnable import RunnablePassthrough
-
 
 CACHE_SETTINGS = dict(cache_key_fn=task_input_hash, cache_expiration=timedelta(days=7))
 
 
 @task
 def load_blessed_tags(blessed_tags_path: str = "blessed_tags.txt") -> Set[str]:
-    """Loads a set of 'blessed' tags from a text file."""
+    """
+    Loads the set of blessed tags from a file.
+    """
+    from prefect import get_run_logger
+    logger = get_run_logger()
     try:
-        with open(blessed_tags_path, "r", encoding="utf-8") as f:
-            tags = {line.strip().lower() for line in f if line.strip()}
-        return tags
+        with open(blessed_tags_path) as f:
+            blessed_tags = {line.strip() for line in f if line.strip()}
+        logger.info(f"Loaded {len(blessed_tags)} blessed tags from {blessed_tags_path}")
+        return blessed_tags
     except FileNotFoundError:
-        print(f"Warning: Blessed tags file not found at {blessed_tags_path}. No tags will be linted.")
-        return set()
+        logger.warning(f"Could not find blessed tags file at: {blessed_tags_path}. Tag linting will not be performed.")
+        return set() # Return an empty set if file not found
 
 
 @task(**CACHE_SETTINGS)
 def extract_main_content(html_content: str) -> str:
-    """Extracts the main readable content from an HTML string."""
-    doc = Document(html_content)
-    # Use BeautifulSoup to clean up the readability output if necessary
-    soup = BeautifulSoup(doc.content(), "html.parser")
-    return soup.get_text(separator="\n", strip=True)
+    """
+    Use BeautifulSoup to parse HTML and implement logic to extract the core article text,
+    stripping out boilerplate like navbars, ads, and footers.
+    """
+    soup = BeautifulSoup(html_content, "lxml")
+    for script_or_style in soup(["script", "style", "header", "footer", "nav"]):
+        script_or_style.decompose()
+
+    article = soup.find("article")
+    if article:
+        return article.get_text(separator=" ", strip=True)
+
+    main_content = soup.find("main")
+    if main_content:
+        return main_content.get_text(separator=" ", strip=True)
+
+    if soup.body:
+        return soup.body.get_text(separator=" ", strip=True)
+
+    return ""
 
 
 @task
 def lint_tags(tags: List[str], blessed_tags: Set[str]) -> List[str]:
-    """Filters a list of tags, keeping only those present in the blessed_tags set."""
+    """
+    Compare input tags against a "blessed" set.
+    Return a list of tags that are in the blessed set.
+    Log warnings for tags that are not in the set.
+    """
+    from prefect import get_run_logger
+
+    logger = get_run_logger()
+
     if not blessed_tags:
-        return tags # If no blessed tags, return all original tags
-    return [tag for tag in tags if tag.lower() in blessed_tags]
+        logger.warning("No blessed tags provided. No tag linting performed.")
+        return tags # Return original tags if no blessed tags are available
+
+    linted_tags = []
+    for tag in tags:
+        if tag in blessed_tags:
+            linted_tags.append(tag)
+        else:
+            logger.warning(f"Tag '{tag}' is not in the blessed list and will be removed.")
+    return linted_tags
 
 
 def get_llm_model():
-    """Initializes and returns the LLM model."""
-    # Ensure OPENAI_API_KEY is set in your environment
-    if not os.getenv("OPENAI_API_KEY"):
-        raise ValueError("OPENAI_API_KEY environment variable not set.")
-    return ChatOpenAI(model="gpt-3.5-turbo", temperature=0)
+    """Gets the LLM model. Assumes `llm` is configured."""
+    return llm.get_model("mlx-community/Llama-3.2-3B-Instruct-4bit")
 
 
 @task(**CACHE_SETTINGS)
 def summarize_content(text: str) -> str:
-    """Summarizes the given text using an LLM."""
-    llm = get_llm_model()
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", "You are an expert summarizer. Summarize the following text concisely."),
-            ("user", "{text}"),
-        ]
+    """
+    Call the LLM API (via llm library) with the text to generate a summary.
+    """
+    model = get_llm_model()
+    prompt = (
+        "Please summarize the following content in one or two concise sentences."
+        "Do not output anything other than the summarisation."
+        "\n\n"
+        f"{text}"
     )
-    chain = {"text": RunnablePassthrough()} | prompt | llm | StrOutputParser()
-    return chain.invoke(text)
+    response = model.prompt(prompt)
+    return response.text()
 
 
 @task(**CACHE_SETTINGS)
 def suggest_tags(text: str) -> List[str]:
-    """Suggests relevant tags for the given text using an LLM."""
-    llm = get_llm_model()
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", "You are an expert tag suggester. Suggest 3-5 relevant, comma-separated tags for the following text. Tags should be lowercase and single words or hyphenated compound words (e.g., 'machine-learning')."),
-            ("user", "{text}"),
-        ]
+    """
+    Call the LLM API (via llm library) to suggest relevant tags.
+    """
+    model = get_llm_model()
+    prompt = (
+        "Based on the following text, suggest 3-5 relevant tags as a single "
+        "space-separated line. Use lowercase and no numbers. Prefer single "
+        "words but use '-' as a delimiter for multiple words if needed."
+        "Output only the suggested tags, nothing else."
+        "Example: python programming distributed-systems ai\n\n"
+        f"{text}"
     )
-    chain = {"text": RunnablePassthrough()} | prompt | llm | StrOutputParser()
-    raw_tags = chain.invoke(text)
-    return [tag.strip().lower() for tag in raw_tags.split(",") if tag.strip()]
+    response = model.prompt(prompt)
+    return response.text().strip().lower().split()
