@@ -3,7 +3,7 @@ from typing import List
 
 from prefect import task
 
-from models import Bookmark
+from bookmark_processor.models import Bookmark
 
 
 @task

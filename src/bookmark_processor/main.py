@@ -4,13 +4,13 @@ from typing import Optional, Set
 import typer
 from prefect import flow, get_run_logger
 
-from models import Bookmark, LivenessResult
-from tasks.io import load_bookmarks, save_results
-from tasks.liveness import (
+from bookmark_processor.models import Bookmark, LivenessResult
+from bookmark_processor.tasks.io import load_bookmarks, save_results
+from bookmark_processor.tasks.liveness import (
     attempt_get_request,
     attempt_headless_browser,
 )
-from tasks.processing import (
+from bookmark_processor.tasks.processing import (
     extract_main_content,
     lint_tags,
     load_blessed_tags, # Added import
