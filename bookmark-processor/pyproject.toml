@@ -25,6 +25,10 @@ dev = [
 [project.scripts]
 bookmark-processor = "main:app"
 
+[tool.setuptools]
+py-modules = ["main", "models"]
+packages = ["tasks"]
+
 [tool.bookmark-processor]
 # General application settings, such as the LLM model to use
 llm_model = "gpt-3.5-turbo"
