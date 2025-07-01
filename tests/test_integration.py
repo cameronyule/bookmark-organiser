@@ -32,12 +32,13 @@ TEST_BLESSED_TAGS_CONTENT = "tech\nprogramming\nscience\n"
 def mock_liveness_result():
     """Fixture to provide a mock LivenessResult."""
     return LivenessResult(
+        url="http://mock.com/test_page", # Added required 'url' field
         is_live=True,
         status_code=200,
-        content_type="text/html",
-        html_content="<html><body><h1>Test Content</h1><p>This is some test content for summarization and tag suggestion. It talks about machine learning and artificial intelligence.</p></body></html>",
-        error_message=None,
-        check_method="MOCK",
+        content="<html><body><h1>Test Content</h1><p>This is some test content for summarization and tag suggestion. It talks about machine learning and artificial intelligence.</p></body></html>", # Renamed html_content to content
+        method="HEADLESS", # Renamed check_method to method and set to a valid literal
+        final_url="http://mock.com/test_page", # Added final_url for completeness
+        # error_message=None, # This field is not in LivenessResult, removed
     )
 
 def test_process_all_bookmarks_flow_integration(tmp_path: Path, mocker, mock_liveness_result):
