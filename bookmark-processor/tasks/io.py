@@ -1,7 +1,7 @@
 import json
 from typing import List, Dict, Any
 from prefect import task
-from bookmark_processor.models import Bookmark
+from models import Bookmark
 
 @task
 def load_bookmarks(filepath: str) -> List[dict]:
