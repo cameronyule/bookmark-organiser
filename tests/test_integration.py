@@ -50,18 +50,20 @@ def prefect_test_fixture():
 
 @pytest.fixture
 def mock_liveness_result():
-    """Fixture to provide a mock LivenessResult."""
+    """Fixture to provide a mock LivenessResult.
+    This fixture is no longer directly used as return_value for liveness_flow,
+    but kept for reference or if needed elsewhere.
+    """
     return LivenessResult(
-        url="http://mock.com/test_page", # Added required 'url' field
+        url="http://mock.com/test_page",
         is_live=True,
         status_code=200,
-        content="<html><body><h1>Test Content</h1><p>This is some test content for summarization and tag suggestion. It talks about machine learning and artificial intelligence.</p></body></html>", # Renamed html_content to content
-        method="HEADLESS", # Renamed check_method to method and set to a valid literal
-        final_url="http://mock.com/test_page", # Added final_url for completeness
-        # error_message=None, # This field is not in LivenessResult, removed
+        content="<html><body><h1>Test Content</h1><p>This is some test content for summarization and tag suggestion. It talks about machine learning and artificial intelligence.</p></body></html>",
+        method="HEADLESS",
+        final_url="http://mock.com/test_page",
     )
 
-def test_process_all_bookmarks_flow_integration(tmp_path: Path, mocker, mock_liveness_result):
+def test_process_all_bookmarks_flow_integration(tmp_path: Path, mocker): # Removed mock_liveness_result from args
     """
     Tests the end-to-end processing flow for all bookmarks.
     """
@@ -74,8 +76,20 @@ def test_process_all_bookmarks_flow_integration(tmp_path: Path, mocker, mock_liv
 
     output_file = tmp_path / "processed_bookmarks_output.json"
 
+    # Define a side effect function for liveness_flow mock
+    def mock_liveness_flow_side_effect(url: str) -> LivenessResult:
+        """Returns a LivenessResult where final_url matches the input url."""
+        return LivenessResult(
+            url=url,
+            is_live=True,
+            status_code=200,
+            content="<html><body><h1>Test Content</h1><p>This is some test content for summarization and tag suggestion. It talks about machine learning and artificial intelligence.</p></body></html>",
+            method="HEADLESS",
+            final_url=url, # Ensure final_url matches the input url
+        )
+
     # Mock Prefect tasks and flows
-    mocker.patch("bookmark_processor.main.liveness_flow", return_value=mock_liveness_result)
+    mocker.patch("bookmark_processor.main.liveness_flow", side_effect=mock_liveness_flow_side_effect) # Use side_effect
     # Patch load_bookmarks where it's used in main.py
     mocker.patch("bookmark_processor.main.load_bookmarks", return_value=json.loads(TEST_BOOKMARKS_CONTENT))
     # Patch save_results where it's used in main.py
@@ -103,7 +117,7 @@ def test_process_all_bookmarks_flow_integration(tmp_path: Path, mocker, mock_liv
     # Check first bookmark
     b1 = processed_bookmarks_list[0]
     assert isinstance(b1, Bookmark)
-    assert b1.href == "http://example.com/page1" # Changed from url to href
+    assert b1.href == "http://example.com/page1" # This assertion will now pass
     assert b1.liveness.is_live is True
     assert b1.extended_description == "A concise summary of test content."
     # Check tags: original + suggested, then linted
@@ -127,7 +141,7 @@ def test_process_all_bookmarks_flow_integration(tmp_path: Path, mocker, mock_liv
     # Check second bookmark
     b2 = processed_bookmarks_list[1]
     assert isinstance(b2, Bookmark)
-    assert b2.href == "http://example.com/page2" # Changed from url to href
+    assert b2.href == "http://example.com/page2" # This assertion will now pass
     assert b2.liveness.is_live is True
     assert b2.extended_description == "A concise summary of test content."
     # Original: science. Suggested: machine-learning, ai, technology. Blessed: tech, programming, science
