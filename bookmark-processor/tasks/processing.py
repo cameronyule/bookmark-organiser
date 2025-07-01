@@ -63,7 +63,7 @@ def lint_tags(tags: List[str], blessed_tags_path: str = "blessed_tags.txt") -> L
 
 def get_llm_model():
     """Gets the LLM model. Assumes `llm` is configured."""
-    return llm.get_model("gpt-3.5-turbo")
+    return llm.get_model("mlx-community/Llama-3.2-3B-Instruct-4bit")
 
 
 @task(**CACHE_SETTINGS)
@@ -73,7 +73,9 @@ def summarize_content(text: str) -> str:
     """
     model = get_llm_model()
     prompt = (
-        "Please summarize the following content in one or two concise sentences:\n\n"
+        "Please summarize the following content in one or two concise sentences."
+        "Do not output anything other than the summarisation."
+        "\n\n"
         f"{text}"
     )
     response = model.prompt(prompt)
@@ -88,7 +90,10 @@ def suggest_tags(text: str) -> List[str]:
     model = get_llm_model()
     prompt = (
         "Based on the following text, suggest 3-5 relevant tags as a single "
-        "space-separated line. Use lowercase. Example: python programming ai\n\n"
+        "space-separated line. Use lowercase and no numbers. Prefer single "
+        "words but use '-' as a delimiter for multiple words if needed."
+        "Output only the suggested tags, nothing else."
+        "Example: python programming distributed-systems ai\n\n"
         f"{text}"
     )
     response = model.prompt(prompt)
