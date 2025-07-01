@@ -11,8 +11,9 @@ dependencies = [
     "beautifulsoup4",
     "lxml",
     "llm",
-    "typer[all]",
-    "pendulum", # Added pendulum dependency
+    "llm-mlx",
+    "typer",
+    "pendulum",
 ]
 
 [project.optional-dependencies]
