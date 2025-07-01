@@ -48,6 +48,7 @@
             export UV_PYTHON=${pkgs.python313}
             uv venv --allow-existing .venv
             source .venv/bin/activate
+            export TOKENIZERS_PARALLELISM=false
           '';
         };
       };
