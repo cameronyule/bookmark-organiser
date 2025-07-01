@@ -46,8 +46,8 @@
           shellHook = ''
             export UV_PYTHON_PREFERENCE="only-system"
             export UV_PYTHON=${pkgs.python313}
-            uv venv --allow-existing bookmark-processor/.venv
-            source bookmark-processor/.venv/bin/activate
+            uv venv --allow-existing .venv
+            source .venv/bin/activate
           '';
         };
       };
