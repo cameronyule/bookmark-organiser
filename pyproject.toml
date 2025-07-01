@@ -1,39 +1,23 @@
 [project]
 name = "bookmark-processor"
 version = "0.1.0"
-description = "A parallelized pipeline to process bookmarks."
-requires-python = ">=3.10"
 dependencies = [
-    "prefect>=2.0",
-    "httpx",
-    "playwright",
-    "pydantic",
-    "beautifulsoup4",
-    "lxml",
-    "llm",
-    "llm-mlx",
     "typer",
-    "pendulum",
+    "prefect",
+    "pydantic",
+    "requests",
+    "beautifulsoup4",
+    "readability-lxml",
+    "langchain",
+    "openai",
+    "tiktoken",
+    "selenium",
+    "webdriver-manager",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest",
-    "respx",
-    "pytest-mock",
-    "ruff",
-]
+[tool.setuptools.packages.find]
+where = ["src"]
 
-[project.scripts]
-bookmark-processor = "main:app"
-
-[tool.setuptools]
-py-modules = ["main", "models"]
-packages = ["tasks"]
-
-[tool.bookmark-processor]
-# General application settings, such as the LLM model to use
-llm_model = "gpt-3.5-turbo"
-
-[tool.ruff]
-line-length = 120
+[tool.pytest.ini_options]
+addopts = "--cov=bookmark_processor --cov-report=term-missing"
+pythonpath = ["src"] # Add src to python path for tests to find the package
