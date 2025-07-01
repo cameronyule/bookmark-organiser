@@ -15,13 +15,18 @@ The implementation will be in **Python 3.10+** and will leverage the following c
 * **Headless Browser:** `playwright` - For the final fallback in the liveness check, capable of rendering JavaScript-heavy pages.
 * **Data Validation:** `pydantic` - To define clear, type-hinted data models for inputs, outputs, and intermediate states.
 * **Content Extraction:** `beautifulsoup4` with `lxml` - To parse HTML and extract the main textual content from a webpage before sending it to an LLM.
-* **LLM Client:** A placeholder for a specific client library (e.g., `openai`, `anthropic`). The implementation should abstract this into a dedicated task.
+* **LLM Client:** `llm` - For interacting with local and remote Large Language Models via its Python API.
 
 ### 2.1. Development Tooling
 
 *   **Dependency & Environment Management:** `uv` will be used for creating virtual environments and managing project dependencies.
 *   **Linting & Formatting:** `ruff` will be used to enforce code style and quality.
 *   **Testing Framework:** `pytest` will be used for writing and running tests. HTTP requests made with `httpx` will be mocked using the `respx` library, and LLM API calls will be mocked using `pytest-mock`.
+
+### 2.2. Configuration
+
+*   **Application Settings:** General application settings, such as the LLM model to use, will be stored in `pyproject.toml` under a `[tool.bookmark-processor]` table.
+*   **Blessed Tags:** The canonical list of approved tags will be stored in a `blessed_tags.txt` file in the project root, with one tag per line.
 
 ## 3. Architectural Approach
 
@@ -34,18 +39,31 @@ The architecture is based on a **Stateful, Idempotent Worker** pattern, implemen
 
 ## 4. Data Models
 
-We will use Pydantic models to ensure data consistency throughout the pipeline.
+We will use Pydantic models to ensure data consistency throughout the pipeline. The input and output format will be the same, using a single `Bookmark` model that mirrors the source JSON structure.
 
 ```python
 # To be defined in models.py
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, field_validator
 from typing import List, Optional, Literal
 
-class BookmarkInput(BaseModel):
-    id: int
-    url: str
+class Bookmark(BaseModel):
+    href: str
+    description: str
+    extended: str
+    meta: str
+    hash: str
+    time: str
+    shared: str
+    toread: str
     tags: List[str]
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def split_tags(cls, v: str) -> List[str]:
+        if isinstance(v, str):
+            return v.split()
+        return v
 
 class LivenessResult(BaseModel):
     status: Literal["success", "failed"]
@@ -53,16 +71,6 @@ class LivenessResult(BaseModel):
     final_url: Optional[str] = None
     content: Optional[str] = None # HTML content
     error_message: Optional[str] = None
-
-class ProcessedBookmarkOutput(BaseModel):
-    source_id: int
-    source_url: str
-    final_url: str
-    status: Literal["processed", "failed"]
-    summary: Optional[str] = None
-    suggested_tags: List[str] = []
-    linting_warnings: List[str] = []
-    failure_reason: Optional[str] = None
 ```
 
 ## 5. Workflow Implementation Details
@@ -70,28 +78,29 @@ class ProcessedBookmarkOutput(BaseModel):
 ### 5.1. Top-Level Flow: `process_all_bookmarks_flow`
 
   * **Decorator:** `@flow(name="Process All Bookmarks", task_runner=ConcurrentTaskRunner())`
-  * **Input:** `bookmarks_filepath: str`
+  * **Input:** `bookmarks_filepath: str`, `output_filepath: str`
   * **Logic:**
-    1.  Read the bookmarks from the input JSON file into a list of `BookmarkInput` models.
-    2.  Iterate through the list.
-    3.  For each bookmark, submit a `process_bookmark_flow` run: `process_bookmark_flow.submit(bookmark)`.
+    1.  Read the bookmarks from the input JSON file into a list of `Bookmark` models.
+    2.  Submit a `process_bookmark_flow` run for each bookmark, collecting the future results.
+    3.  Gather the results (the modified `Bookmark` objects) from all completed subflow runs.
+    4.  Call `save_results(bookmarks, output_filepath)` to write all processed bookmarks to the output file.
 
 ### 5.2. Bookmark Subflow: `process_bookmark_flow`
 
   * **Decorator:** `@flow(name="Process Single Bookmark")`
-  * **Input:** `bookmark: BookmarkInput`
+  * **Input:** `bookmark: Bookmark`
+  * **Output:** `Bookmark` (the modified bookmark)
   * **Logic:**
-    1.  Call the `liveness_flow` with `bookmark.url`.
-    2.  Use a `try...except LivenessCheckFailed` block to handle total failure of the liveness check. If it fails, create a `ProcessedBookmarkOutput` with `status="failed"` and save it.
-    3.  If `liveness_flow` succeeds, extract the HTML `content` from its result.
-    4.  Call `extract_main_content(content)` to get clean text.
-    5.  Submit the following tasks to run in parallel:
-          * `summarize_content.submit(clean_text)`
-          * `suggest_tags.submit(clean_text)`
-          * `lint_tags.submit(bookmark.tags)`
-    6.  Wait for the parallel tasks to complete and gather their results.
-    7.  Assemble the final `ProcessedBookmarkOutput` model with `status="processed"`.
-    8.  Call a final task `save_result(output_model)` to write the result to a file or database.
+    1.  Call `lint_tags(bookmark.tags)` and log any warnings.
+    2.  Call `liveness_flow(bookmark.href)`.
+    3.  If `liveness_flow` fails (raises `LivenessCheckFailed`):
+        *   Add `"not-live"` to `bookmark.tags` if not already present.
+        *   Return the `bookmark`.
+    4.  If `liveness_flow` succeeds, it returns a `LivenessResult`.
+    5.  A text source is needed for the LLM. Use `bookmark.extended` if it's not empty, otherwise, call `extract_main_content(liveness_result.content)`.
+    6.  If `bookmark.extended` was originally empty, call `summarize_content(text_source)` and update `bookmark.extended` with the result.
+    7.  Call `suggest_tags(text_source)` and add any new tags to `bookmark.tags`.
+    8.  Return the modified `bookmark`.
 
 ### 5.3. Liveness Subflow: `liveness_flow`
 
@@ -129,16 +138,16 @@ All tasks that perform network I/O or heavy computation should use caching.
       * Action: Use `BeautifulSoup` to parse HTML and implement logic to extract the core article text, stripping out boilerplate like navbars, ads, and footers.
   * **`lint_tags(tags: List[str]) -> List[str]`**
       * Decorator: `@task` (No caching needed, it's fast).
-      * Action: Compare input tags against a predefined "blessed" list. Return a list of warnings.
+      * Action: Compare input tags against a "blessed" list read from `blessed_tags.txt`. Return a list of warnings for tags that are not in the list.
   * **`summarize_content(text: str) -> str`**
       * Decorator: `@task(**CACHE_SETTINGS)`
-      * Action: Call the external/local LLM API with the text to generate a summary.
+      * Action: Call the LLM API (via `llm` library) with the text to generate a summary.
   * **`suggest_tags(text: str) -> List[str]`**
       * Decorator: `@task(**CACHE_SETTINGS)`
-      * Action: Call the external/local LLM API to suggest relevant tags.
-  * **`save_result(result: ProcessedBookmarkOutput)`**
+      * Action: Call the LLM API (via `llm` library) to suggest relevant tags.
+  * **`save_results(results: List[Bookmark], filepath: str)`**
       * Decorator: `@task`
-      * Action: Append the processed result to a master output JSON file. This task must be designed to handle concurrent writes safely (e.g., using a file lock).
+      * Action: Write the list of processed `Bookmark` objects to the specified output JSON file, overwriting it if it exists.
 
 ## 6. Proposed Project Structure
 
@@ -151,9 +160,10 @@ All tasks that perform network I/O or heavy computation should use caching.
 |   |-- __init__.py
 |   |-- liveness.py     # Contains liveness-related tasks
 |   |-- processing.py   # Contains content processing tasks (LLM, linting)
-|   |-- io.py           # Contains save_result task
+|   |-- io.py           # Contains save_results task
 |-- bookmarks_input.json # Example input data
-|-- pyproject.toml      # Project configuration for uv, ruff, and pytest
+|-- blessed_tags.txt    # List of approved tags, one per line
+|-- pyproject.toml      # Project dependencies and tool configuration
 |-- prefect.yaml        # Prefect deployment configuration (optional)
 ```
 
