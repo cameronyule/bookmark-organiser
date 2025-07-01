@@ -4,7 +4,6 @@ from typing import List
 
 import typer
 from prefect import flow, get_run_logger
-from prefect.task_runners import ConcurrentTaskRunner
 import pendulum # Import pendulum for timezone-aware datetime
 
 from models import Bookmark, LivenessResult
@@ -170,7 +169,7 @@ def process_bookmark_flow(bookmark: Bookmark) -> Bookmark:
     return bookmark
 
 
-@flow(name="Process All Bookmarks", task_runner=ConcurrentTaskRunner())
+@flow(name="Process All Bookmarks")
 def process_all_bookmarks_flow(bookmarks_filepath: str, output_filepath: str):
     """
     Orchestrates the entire bookmark processing pipeline.
@@ -182,12 +181,9 @@ def process_all_bookmarks_flow(bookmarks_filepath: str, output_filepath: str):
     bookmarks = [Bookmark.model_validate(item) for item in data]
     logger.info(f"Found {len(bookmarks)} bookmarks to process.")
 
-    # Process each bookmark concurrently as a subflow
-    # Call subflows directly, Prefect handles concurrency with ConcurrentTaskRunner
-    futures = [process_bookmark_flow(b) for b in bookmarks]
-    logger.info(f"Submitted {len(futures)} bookmark processing subflows.")
-
-    results = [future.result() for future in futures]
+    # Process each bookmark as a subflow.
+    # With the default SequentialTaskRunner, these will run one after another.
+    results = [process_bookmark_flow(b) for b in bookmarks]
     logger.info("All subflows completed.")
 
     logger.info(f"Saving {len(results)} processed bookmarks to {output_filepath}")
