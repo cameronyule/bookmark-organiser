@@ -94,11 +94,12 @@ def test_process_all_bookmarks_flow_integration(tmp_path: Path, mocker): # Remov
     mocker.patch("bookmark_processor.main.load_bookmarks", return_value=json.loads(TEST_BOOKMARKS_CONTENT))
     # Patch save_results where it's used in main.py
     mock_save_results = mocker.patch("bookmark_processor.main.save_results") # Capture the mock object
-    mocker.patch("bookmark_processor.tasks.processing.load_blessed_tags", return_value={"tech", "programming", "science"})
-    mocker.patch("bookmark_processor.tasks.processing.extract_main_content", return_value="Test content about machine learning and AI.")
-    mocker.patch("bookmark_processor.tasks.processing.summarize_content", return_value="A concise summary of test content.")
-    mocker.patch("bookmark_processor.tasks.processing.suggest_tags", return_value=["machine-learning", "ai", "technology"])
-    mocker.patch("bookmark_processor.tasks.processing.lint_tags", side_effect=lambda tags, blessed: [t for t in tags if t in blessed])
+    # Corrected patch targets to point to where they are imported in bookmark_processor.main
+    mocker.patch("bookmark_processor.main.load_blessed_tags", return_value={"tech", "programming", "science"})
+    mocker.patch("bookmark_processor.main.extract_main_content", return_value="Test content about machine learning and AI.")
+    mocker.patch("bookmark_processor.main.summarize_content", return_value="A concise summary of test content.")
+    mocker.patch("bookmark_processor.main.suggest_tags", return_value=["machine-learning", "ai", "technology"])
+    mocker.patch("bookmark_processor.main.lint_tags", side_effect=lambda tags, blessed: [t for t in tags if t in blessed])
 
 
     # Run the flow
