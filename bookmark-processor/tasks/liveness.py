@@ -1,4 +1,5 @@
 from datetime import timedelta
+from typing import Optional, Dict, Any
 
 import httpx
 from playwright.sync_api import sync_playwright
@@ -17,39 +18,64 @@ class LivenessCheckFailed(Exception):
 
 
 @task(retries=2, retry_delay_seconds=5, **CACHE_SETTINGS)
-def attempt_head_request(url: str) -> str:
+def attempt_head_request(url: str) -> Optional[Dict[str, Any]]:
     """
-    Use httpx to make a HEAD request. Follow redirects. Return the final URL.
+    Use httpx to make a HEAD request. Follow redirects. Return final URL and status code.
+    Returns None if the request fails.
     """
-    with httpx.Client(follow_redirects=True) as client:
-        response = client.head(url, timeout=10)
-        response.raise_for_status()
-        return str(response.url)
+    try:
+        with httpx.Client(follow_redirects=True) as client:
+            response = client.head(url, timeout=10)
+            response.raise_for_status()
+            return {"final_url": str(response.url), "status_code": response.status_code}
+    except httpx.RequestError as e:
+        # Log the error but don't raise, allow fallback
+        return None
 
 
 @task(retries=2, retry_delay_seconds=10, **CACHE_SETTINGS)
-def attempt_get_request(url: str) -> dict:
+def attempt_get_request(url: str) -> Optional[Dict[str, Any]]:
     """
-    Use httpx to make a GET request. Return a dict {"final_url": str, "content": str}.
+    Use httpx to make a GET request. Return a dict {"final_url": str, "content": str, "status_code": int}.
+    Returns None if the request fails.
     """
-    with httpx.Client(follow_redirects=True) as client:
-        response = client.get(url, timeout=20)
-        response.raise_for_status()
-        return {"final_url": str(response.url), "content": response.text}
+    try:
+        with httpx.Client(follow_redirects=True) as client:
+            response = client.get(url, timeout=20)
+            response.raise_for_status()
+            return {
+                "final_url": str(response.url),
+                "content": response.text,
+                "status_code": response.status_code,
+            }
+    except httpx.RequestError as e:
+        # Log the error but don't raise, allow fallback
+        return None
 
 
 @task(retries=1, retry_delay_seconds=30, **CACHE_SETTINGS)
-def attempt_headless_browser(url: str) -> dict:
+def attempt_headless_browser(url: str) -> Optional[Dict[str, Any]]:
     """
-    Use playwright to load the page. Return a dict {"final_url": str, "content": str}.
+    Use playwright to load the page. Return a dict {"final_url": str, "content": str, "status_code": int}.
+    Returns None if the request fails.
     """
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page()
-        try:
-            page.goto(url, wait_until="domcontentloaded", timeout=60000)
-            content = page.content()
-            final_url = page.url
-        finally:
-            browser.close()
-        return {"final_url": final_url, "content": content}
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page()
+            try:
+                response = page.goto(url, wait_until="domcontentloaded", timeout=60000)
+                content = page.content()
+                final_url = page.url
+                status_code = response.status() if response else None # Get status code from response
+            finally:
+                browser.close()
+            return {
+                "final_url": final_url,
+                "content": content,
+                "status_code": status_code,
+            }
+    except Exception as e:
+        # Catch any Playwright or other exceptions and return None
+        return None
+

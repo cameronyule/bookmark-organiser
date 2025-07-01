@@ -39,20 +39,26 @@ def extract_main_content(html_content: str) -> str:
 def lint_tags(tags: List[str], blessed_tags_path: str = "blessed_tags.txt") -> List[str]:
     """
     Compare input tags against a "blessed" list read from blessed_tags.txt.
-    Return a list of warnings for tags that are not in the list.
+    Return a list of tags that are in the blessed list.
+    Log warnings for tags that are not in the list.
     """
+    from prefect import get_run_logger
+    logger = get_run_logger()
+
     try:
         with open(blessed_tags_path) as f:
             blessed_tags = {line.strip() for line in f if line.strip()}
     except FileNotFoundError:
-        return [f"Could not find blessed tags file at: {blessed_tags_path}"]
+        logger.warning(f"Could not find blessed tags file at: {blessed_tags_path}. No tag linting performed.")
+        return tags # Return original tags if blessed file not found
 
-    warnings = [
-        f"Tag '{tag}' is not in the blessed list."
-        for tag in tags
-        if tag not in blessed_tags
-    ]
-    return warnings
+    linted_tags = []
+    for tag in tags:
+        if tag in blessed_tags:
+            linted_tags.append(tag)
+        else:
+            logger.warning(f"Tag '{tag}' is not in the blessed list and will be removed.")
+    return linted_tags
 
 
 def get_llm_model():
@@ -87,3 +93,4 @@ def suggest_tags(text: str) -> List[str]:
     )
     response = model.prompt(prompt)
     return response.text().strip().lower().split()
+
