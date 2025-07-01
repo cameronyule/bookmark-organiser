@@ -12,6 +12,7 @@ dependencies = [
     "lxml",
     "llm",
     "typer[all]",
+    "pendulum", # Added pendulum dependency
 ]
 
 [project.optional-dependencies]
