@@ -21,7 +21,7 @@ TEST_BOOKMARKS_CONTENT = """
         "time": "2023-01-01T10:00:00Z",
         "shared": "yes",
         "toread": "no",
-        "tags": "tech, programming"
+        "tags": "tech programming"
     },
     {
         "href": "http://example.com/page2",
