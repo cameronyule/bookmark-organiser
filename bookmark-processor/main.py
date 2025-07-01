@@ -24,14 +24,9 @@ from tasks.processing import (
 app = typer.Typer()
 
 
-@flow(name="Check URL Liveness")
-def liveness_flow(url: str) -> LivenessResult:
-    """
-    Checks the liveness of a given URL using a fallback chain: HEAD -> GET -> Headless.
-    """
+def _perform_head_check(url: str) -> Optional[LivenessResult]:
+    """Attempts a HEAD request and returns LivenessResult if successful."""
     logger = get_run_logger()
-
-    # Attempt HEAD request first
     try:
         logger.info(f"Attempting HEAD request for {url}")
         head_result = attempt_head_request(url)
@@ -43,12 +38,15 @@ def liveness_flow(url: str) -> LivenessResult:
                 status_code=head_result["status_code"],
                 method="HEAD",
                 final_url=head_result["final_url"],
-                content=None # HEAD request does not return content
+                content=None
             )
     except Exception as e:
         logger.warning(f"HEAD request failed for {url}: {e}")
+    return None
 
-    # Attempt GET request
+def _perform_get_check(url: str) -> Optional[LivenessResult]:
+    """Attempts a GET request and returns LivenessResult if successful."""
+    logger = get_run_logger()
     try:
         logger.info(f"Attempting GET request for {url}")
         get_result = attempt_get_request(url)
@@ -64,8 +62,11 @@ def liveness_flow(url: str) -> LivenessResult:
             )
     except Exception as e:
         logger.warning(f"GET request failed for {url}: {e}")
+    return None
 
-    # Attempt headless browser
+def _perform_headless_check(url: str) -> Optional[LivenessResult]:
+    """Attempts a headless browser check and returns LivenessResult if successful."""
+    logger = get_run_logger()
     try:
         logger.info(f"Attempting headless browser for {url}")
         headless_result = attempt_headless_browser(url)
@@ -81,6 +82,30 @@ def liveness_flow(url: str) -> LivenessResult:
             )
     except Exception as e:
         logger.warning(f"Headless browser failed for {url}: {e}")
+    return None
+
+
+@flow(name="Check URL Liveness")
+def liveness_flow(url: str) -> LivenessResult:
+    """
+    Checks the liveness of a given URL using a fallback chain: HEAD -> GET -> Headless.
+    """
+    logger = get_run_logger()
+
+    # Attempt HEAD request first
+    head_check_result = _perform_head_check(url)
+    if head_check_result:
+        return head_check_result
+
+    # Attempt GET request
+    get_check_result = _perform_get_check(url)
+    if get_check_result:
+        return get_check_result
+
+    # Attempt headless browser
+    headless_check_result = _perform_headless_check(url)
+    if headless_check_result:
+        return headless_check_result
 
     logger.error(f"All liveness checks failed for URL: {url}")
     return LivenessResult(url=url, is_live=False, status_code=None, method="NONE", final_url=None, content=None)
