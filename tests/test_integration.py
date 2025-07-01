@@ -118,8 +118,7 @@ def test_process_all_bookmarks_flow_integration(tmp_path: Path, mocker): # Remov
     b1 = processed_bookmarks_list[0]
     assert isinstance(b1, Bookmark)
     assert b1.href == "http://example.com/page1"
-    # Removed: assert b1.liveness.is_live is True
-    assert b1.extended_description == "A concise summary of test content."
+    assert b1.extended == "A concise summary of test content." # Changed from extended_description to extended
     # Check tags: original + suggested, then linted
     # Original: tech, programming. Suggested: machine-learning, ai, technology. Blessed: tech, programming, science
     # Expected: tech, programming, machine-learning, ai, technology (before linting)
@@ -142,8 +141,7 @@ def test_process_all_bookmarks_flow_integration(tmp_path: Path, mocker): # Remov
     b2 = processed_bookmarks_list[1]
     assert isinstance(b2, Bookmark)
     assert b2.href == "http://example.com/page2"
-    # Removed: assert b2.liveness.is_live is True
-    assert b2.extended_description == "A concise summary of test content."
+    assert b2.extended == "A concise summary of test content." # Changed from extended_description to extended
     # Original: science. Suggested: machine-learning, ai, technology. Blessed: tech, programming, science
     # After linting: only "science" should remain.
     assert sorted(b2.tags) == sorted(["science"])
