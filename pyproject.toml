@@ -18,12 +18,10 @@ dependencies = [
     # keep-sorted end
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
-    "pytest",
-    "respx",
+    "pytest>=8.4.1",
     "pytest-mock",
-    "ruff",
 ]
 
 [project.scripts]
@@ -32,10 +30,6 @@ bookmark-processor = "bookmark_processor.main:app"
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.pytest.ini_options]
-addopts = "--cov=bookmark_processor --cov-report=term-missing"
-pythonpath = ["src"] # Add src to python path for tests to find the package
-
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
