@@ -96,17 +96,13 @@ def process_bookmark_flow(bookmark: Bookmark) -> Bookmark:
 
     # 1. Check URL Liveness
     liveness_result = liveness_flow(bookmark.href)
-    bookmark.is_live = liveness_result.is_live
-    bookmark.liveness_checked_on = pendulum.now("UTC")
-    bookmark.liveness_method = liveness_result.method
-    bookmark.liveness_status_code = liveness_result.status_code
 
     # Update bookmark href to final URL if redirect occurred
     if liveness_result.final_url and liveness_result.final_url != bookmark.href:
         logger.info(f"URL {bookmark.href} redirected to {liveness_result.final_url}")
         bookmark.href = liveness_result.final_url
 
-    if not bookmark.is_live:
+    if not liveness_result.is_live:
         logger.warning(f"Bookmark {bookmark.href} is not live. Skipping content processing.")
         # Even if not live, we still want to lint tags and save the bookmark
         initial_tags = bookmark.tags
@@ -117,7 +113,7 @@ def process_bookmark_flow(bookmark: Bookmark) -> Bookmark:
         return bookmark
 
     # 2. Determine text source for processing
-    text_source = None
+    text_source = None # This variable will hold the extracted content temporarily
     if bookmark.extended:
         text_source = bookmark.extended
         logger.info("Using existing 'extended' description as text source.")
@@ -137,19 +133,16 @@ def process_bookmark_flow(bookmark: Bookmark) -> Bookmark:
         except Exception as e:
             logger.error(f"Error during direct GET for {bookmark.href}: {e}")
 
-    bookmark.content = text_source # Store the extracted main content
-
     # 3. Summarize Content (only if content exists and no existing extended description)
-    if bookmark.content and not bookmark.extended:
+    if text_source and not bookmark.extended:
         logger.info("Summarizing content for 'extended' description.")
-        summary = summarize_content(bookmark.content)
-        bookmark.summary = summary # Store summary in new 'summary' field
-        bookmark.extended = summary # Also update 'extended' as per original logic
+        summary = summarize_content(text_source) # This variable will hold the summary temporarily
+        bookmark.extended = summary # Update 'extended' as per original logic
 
     # 4. Suggest Tags
-    if bookmark.content:
+    if text_source:
         logger.info("Suggesting new tags.")
-        new_tags = suggest_tags(bookmark.content)
+        new_tags = suggest_tags(text_source)
         # Combine existing tags with suggested tags, ensuring uniqueness
         all_tags = set(bookmark.tags)
         all_tags.update(new_tags)
