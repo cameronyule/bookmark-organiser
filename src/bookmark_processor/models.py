@@ -30,6 +30,6 @@ class LivenessResult(BaseModel):
     url: str
     is_live: bool
     status_code: Optional[int] = None
-    method: Literal["GET", "HEADLESS", "NONE", "ERROR"] # Removed "HEAD"
+    method: Literal["GET", "HEADLESS", "NONE", "ERROR"]  # Removed "HEAD"
     final_url: Optional[str] = None
     content: Optional[str] = None

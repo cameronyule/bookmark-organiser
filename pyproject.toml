@@ -5,16 +5,16 @@ description = "A parallelized pipeline to process bookmarks."
 requires-python = ">=3.10"
 dependencies = [
     # keep-sorted start
-    "prefect>=2.0",
-    "httpx",
-    "playwright",
-    "pydantic",
     "beautifulsoup4",
-    "lxml",
+    "httpx",
     "llm",
     "llm-mlx",
-    "typer",
+    "lxml",
     "pendulum",
+    "playwright",
+    "prefect>=2.0",
+    "pydantic",
+    "typer",
     # keep-sorted end
 ]
 

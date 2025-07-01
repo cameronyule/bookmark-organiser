@@ -46,7 +46,9 @@ def attempt_headless_browser(url: str) -> Optional[Dict[str, Any]]:
                 response = page.goto(url, wait_until="domcontentloaded", timeout=60000)
                 content = page.content()
                 final_url = page.url
-                status_code = response.status() if response else None  # Get status code from response
+                status_code = (
+                    response.status() if response else None
+                )  # Get status code from response
             finally:
                 browser.close()
             return {

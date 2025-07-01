@@ -13,7 +13,7 @@ from bookmark_processor.tasks.liveness import (
 from bookmark_processor.tasks.processing import (
     extract_main_content,
     lint_tags,
-    load_blessed_tags, # Added import
+    load_blessed_tags,  # Added import
     suggest_tags,
     summarize_content,
 )
@@ -49,7 +49,9 @@ def _perform_headless_check(url: str) -> Optional[LivenessResult]:
         logger.info(f"Attempting headless browser for {url}")
         headless_result = attempt_headless_browser(url)
         if headless_result:
-            logger.info(f"Headless browser success for {url}, status: {headless_result['status_code']}")
+            logger.info(
+                f"Headless browser success for {url}, status: {headless_result['status_code']}"
+            )
             return LivenessResult(
                 url=url,
                 is_live=True,
@@ -91,7 +93,9 @@ def liveness_flow(url: str) -> LivenessResult:
     )
 
 
-def _get_and_extract_content_source(bookmark: Bookmark, liveness_result: LivenessResult) -> Optional[str]:
+def _get_and_extract_content_source(
+    bookmark: Bookmark, liveness_result: LivenessResult
+) -> Optional[str]:
     """Determines the primary text source for processing (extended, fetched HTML, or direct GET)."""
     logger = get_run_logger()
     text_source = None
@@ -111,13 +115,17 @@ def _get_and_extract_content_source(bookmark: Bookmark, liveness_result: Livenes
                 text_source = extract_main_content(get_result["content"])
                 logger.info(f"Direct GET successful for {bookmark.href}.")
             else:
-                logger.warning(f"Direct GET failed to retrieve content for {bookmark.href}.")
+                logger.warning(
+                    f"Direct GET failed to retrieve content for {bookmark.href}."
+                )
         except Exception as e:
             logger.error(f"Error during direct GET for {bookmark.href}: {e}")
     return text_source
 
 
-def _summarize_and_update_extended(bookmark: Bookmark, text_source: Optional[str]) -> None:
+def _summarize_and_update_extended(
+    bookmark: Bookmark, text_source: Optional[str]
+) -> None:
     """Summarizes content and updates bookmark.extended if conditions are met."""
     logger = get_run_logger()
     if text_source and not bookmark.extended:
@@ -138,18 +146,24 @@ def _suggest_and_add_new_tags(bookmark: Bookmark, text_source: Optional[str]) ->
         logger.info(f"Added new tags for {bookmark.href}: {new_tags}")
 
 
-def _lint_and_filter_tags(bookmark: Bookmark, blessed_tags_set: Set[str]) -> None: # Modified signature
+def _lint_and_filter_tags(
+    bookmark: Bookmark, blessed_tags_set: Set[str]
+) -> None:  # Modified signature
     """Lints existing tags and removes unblessed ones."""
     logger = get_run_logger()
     initial_tags = bookmark.tags
-    bookmark.tags = lint_tags(bookmark.tags, blessed_tags_set) # Passed blessed_tags_set
+    bookmark.tags = lint_tags(
+        bookmark.tags, blessed_tags_set
+    )  # Passed blessed_tags_set
     removed_tags = set(initial_tags) - set(bookmark.tags)
     if removed_tags:
         logger.info(f"Removed unblessed tags for {bookmark.href}: {list(removed_tags)}")
 
 
 @flow(name="Process Single Bookmark")
-def process_bookmark_flow(bookmark: Bookmark, blessed_tags_set: Set[str]) -> Bookmark: # Modified signature
+def process_bookmark_flow(
+    bookmark: Bookmark, blessed_tags_set: Set[str]
+) -> Bookmark:  # Modified signature
     """
     Processes a single bookmark: checks liveness, extracts content, summarizes, and suggests tags.
     """
@@ -166,9 +180,11 @@ def process_bookmark_flow(bookmark: Bookmark, blessed_tags_set: Set[str]) -> Boo
         bookmark.href = liveness_result.final_url
 
     if not liveness_result.is_live:
-        logger.warning(f"Bookmark {bookmark.href} is not live. Skipping content processing.")
+        logger.warning(
+            f"Bookmark {bookmark.href} is not live. Skipping content processing."
+        )
         # Even if not live, we still want to lint tags and save the bookmark
-        _lint_and_filter_tags(bookmark, blessed_tags_set) # Passed blessed_tags_set
+        _lint_and_filter_tags(bookmark, blessed_tags_set)  # Passed blessed_tags_set
         # Append "not-live" tag for bookmarks that failed all liveness checks
         bookmark.tags.append("not-live")
         return bookmark
@@ -183,7 +199,7 @@ def process_bookmark_flow(bookmark: Bookmark, blessed_tags_set: Set[str]) -> Boo
     _suggest_and_add_new_tags(bookmark, text_source)
 
     # 5. Lint Tags
-    _lint_and_filter_tags(bookmark, blessed_tags_set) # Passed blessed_tags_set
+    _lint_and_filter_tags(bookmark, blessed_tags_set)  # Passed blessed_tags_set
 
     logger.info(f"Finished processing bookmark: {bookmark.href}")
     return bookmark
@@ -202,11 +218,13 @@ def process_all_bookmarks_flow(bookmarks_filepath: str, output_filepath: str):
     logger.info(f"Found {len(bookmarks)} bookmarks to process.")
 
     # Load blessed tags once
-    blessed_tags_set = load_blessed_tags("blessed_tags.txt") # Loaded once
+    blessed_tags_set = load_blessed_tags("blessed_tags.txt")  # Loaded once
 
     # Process each bookmark as a subflow.
     # With the default SequentialTaskRunner, these will run one after another.
-    results = [process_bookmark_flow(b, blessed_tags_set) for b in bookmarks] # Passed blessed_tags_set
+    results = [
+        process_bookmark_flow(b, blessed_tags_set) for b in bookmarks
+    ]  # Passed blessed_tags_set
     logger.info("All subflows completed.")
 
     logger.info(f"Saving {len(results)} processed bookmarks to {output_filepath}")

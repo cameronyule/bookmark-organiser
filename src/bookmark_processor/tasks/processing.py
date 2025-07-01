@@ -15,6 +15,7 @@ def load_blessed_tags(blessed_tags_path: str = "blessed_tags.txt") -> Set[str]:
     Loads the set of blessed tags from a file.
     """
     from prefect import get_run_logger
+
     logger = get_run_logger()
     try:
         with open(blessed_tags_path) as f:
@@ -22,8 +23,10 @@ def load_blessed_tags(blessed_tags_path: str = "blessed_tags.txt") -> Set[str]:
         logger.info(f"Loaded {len(blessed_tags)} blessed tags from {blessed_tags_path}")
         return blessed_tags
     except FileNotFoundError:
-        logger.warning(f"Could not find blessed tags file at: {blessed_tags_path}. Tag linting will not be performed.")
-        return set() # Return an empty set if file not found
+        logger.warning(
+            f"Could not find blessed tags file at: {blessed_tags_path}. Tag linting will not be performed."
+        )
+        return set()  # Return an empty set if file not found
 
 
 @task(**CACHE_SETTINGS)
@@ -63,14 +66,16 @@ def lint_tags(tags: List[str], blessed_tags: Set[str]) -> List[str]:
 
     if not blessed_tags:
         logger.warning("No blessed tags provided. No tag linting performed.")
-        return tags # Return original tags if no blessed tags are available
+        return tags  # Return original tags if no blessed tags are available
 
     linted_tags = []
     for tag in tags:
         if tag in blessed_tags:
             linted_tags.append(tag)
         else:
-            logger.warning(f"Tag '{tag}' is not in the blessed list and will be removed.")
+            logger.warning(
+                f"Tag '{tag}' is not in the blessed list and will be removed."
+            )
     return linted_tags
 
 
