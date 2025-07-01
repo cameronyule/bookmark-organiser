@@ -16,6 +16,7 @@ The implementation will be in **Python 3.10+** and will leverage the following c
 * **Data Validation:** `pydantic` - To define clear, type-hinted data models for inputs, outputs, and intermediate states.
 * **Content Extraction:** `beautifulsoup4` with `lxml` - To parse HTML and extract the main textual content from a webpage before sending it to an LLM.
 * **LLM Client:** `llm` - For interacting with local and remote Large Language Models via its Python API.
+* **CLI Framework:** `typer` - For creating a user-friendly command-line interface.
 
 ### 2.1. Development Tooling
 
@@ -172,4 +173,31 @@ All tasks that perform network I/O or heavy computation should use caching.
 *   **Unit Tests:** Each task will be tested in isolation. For example, `extract_main_content` will be tested with sample HTML strings, and `lint_tags` will be tested with various tag lists.
 *   **Integration Tests:** The interaction between tasks within a flow will be tested. This will involve mocking external services. HTTP requests made with `httpx` will be mocked using the `respx` library, and LLM API calls will be mocked using `pytest-mock`.
 *   **Flow Tests:** The `liveness_flow` and `process_bookmark_flow` will be tested as units, using Prefect's testing utilities to run them synchronously and assert their outcomes against mock data.
+
+## 8. Command-Line Interface
+
+The application will be executed via a command-line interface built with `typer`.
+
+To create a user-friendly command, we will define a script entry point in `pyproject.toml`. This allows `uv` to run the application with a simple, memorable name.
+
+**`pyproject.toml` configuration:**
+```toml
+[project.scripts]
+bookmark-processor = "main:app"
+```
+
+**Command Signature:**
+```
+uv run bookmark-processor [OPTIONS] INPUT_FILE OUTPUT_FILE
+```
+
+**Arguments:**
+
+*   `INPUT_FILE`: (Required) The path to the input JSON file containing the bookmarks.
+*   `OUTPUT_FILE`: (Required) The path where the output JSON file will be saved.
+
+**Example Usage:**
+```bash
+uv run bookmark-processor bookmarks_input.json processed_bookmarks.json
+```
 
