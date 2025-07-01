@@ -24,3 +24,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 addopts = "--cov=bookmark_processor --cov-report=term-missing"
 pythonpath = ["src"] # Add src to python path for tests to find the package
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
