@@ -1,0 +1,9 @@
+python
+programming
+devops
+ai
+llm
+testing
+tools
+orchestration
+language

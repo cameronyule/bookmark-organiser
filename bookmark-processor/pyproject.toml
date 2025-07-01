@@ -1,0 +1,36 @@
+[project]
+name = "bookmark-processor"
+version = "0.1.0"
+description = "A parallelized pipeline to process bookmarks."
+requires-python = ">=3.10"
+dependencies = [
+    "prefect>=2.0",
+    "httpx",
+    "playwright",
+    "pydantic",
+    "beautifulsoup4",
+    "lxml",
+    "llm",
+    "typer[all]",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "respx",
+    "pytest-mock",
+    "ruff",
+]
+
+[project.scripts]
+bookmark-processor = "main:app"
+
+[tool.bookmark-processor]
+# General application settings, such as the LLM model to use
+llm_model = "gpt-3.5-turbo"
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
