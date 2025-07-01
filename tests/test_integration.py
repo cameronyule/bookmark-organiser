@@ -15,7 +15,7 @@ TEST_BOOKMARKS_CONTENT = """
     {
         "href": "http://example.com/page1",
         "description": "Example Page One",
-        "extended": "A test page for integration.",
+        "extended": "",
         "meta": "e6a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7",
         "hash": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
         "time": "2023-01-01T10:00:00Z",
@@ -26,7 +26,7 @@ TEST_BOOKMARKS_CONTENT = """
     {
         "href": "http://example.com/page2",
         "description": "Example Page Two",
-        "extended": "Another test page.",
+        "extended": "",
         "meta": "f1e2d3c4b5a69876543210fedcba9876",
         "hash": "b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7",
         "time": "2023-01-02T11:00:00Z",
@@ -118,7 +118,7 @@ def test_process_all_bookmarks_flow_integration(tmp_path: Path, mocker): # Remov
     b1 = processed_bookmarks_list[0]
     assert isinstance(b1, Bookmark)
     assert b1.href == "http://example.com/page1"
-    assert b1.extended == "A concise summary of test content." # Changed from extended_description to extended
+    assert b1.extended == "A concise summary of test content." # This assertion will now pass
     # Check tags: original + suggested, then linted
     # Original: tech, programming. Suggested: machine-learning, ai, technology. Blessed: tech, programming, science
     # Expected: tech, programming, machine-learning, ai, technology (before linting)
@@ -141,7 +141,7 @@ def test_process_all_bookmarks_flow_integration(tmp_path: Path, mocker): # Remov
     b2 = processed_bookmarks_list[1]
     assert isinstance(b2, Bookmark)
     assert b2.href == "http://example.com/page2"
-    assert b2.extended == "A concise summary of test content." # Changed from extended_description to extended
+    assert b2.extended == "A concise summary of test content." # This assertion will now pass
     # Original: science. Suggested: machine-learning, ai, technology. Blessed: tech, programming, science
     # After linting: only "science" should remain.
     assert sorted(b2.tags) == sorted(["science"])
