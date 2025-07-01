@@ -1,18 +1,29 @@
 [project]
 name = "bookmark-processor"
 version = "0.1.0"
+description = "A parallelized pipeline to process bookmarks."
+requires-python = ">=3.10"
 dependencies = [
-    "typer",
-    "prefect",
+    # keep-sorted start
+    "prefect>=2.0",
+    "httpx",
+    "playwright",
     "pydantic",
-    "requests",
     "beautifulsoup4",
-    "readability-lxml",
-    "langchain",
-    "openai",
-    "tiktoken",
-    "selenium",
-    "webdriver-manager",
+    "lxml",
+    "llm",
+    "llm-mlx",
+    "typer",
+    "pendulum",
+    # keep-sorted end
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "respx",
+    "pytest-mock",
+    "ruff",
 ]
 
 [project.scripts]
