@@ -17,6 +17,12 @@ The implementation will be in **Python 3.10+** and will leverage the following c
 * **Content Extraction:** `beautifulsoup4` with `lxml` - To parse HTML and extract the main textual content from a webpage before sending it to an LLM.
 * **LLM Client:** A placeholder for a specific client library (e.g., `openai`, `anthropic`). The implementation should abstract this into a dedicated task.
 
+### 2.1. Development Tooling
+
+*   **Dependency & Environment Management:** `uv` will be used for creating virtual environments and managing project dependencies.
+*   **Linting & Formatting:** `ruff` will be used to enforce code style and quality.
+*   **Testing Framework:** `pytest` will be used for writing and running tests. HTTP requests made with `httpx` will be mocked using the `respx` library, and LLM API calls will be mocked using `pytest-mock`.
+
 ## 3. Architectural Approach
 
 The architecture is based on a **Stateful, Idempotent Worker** pattern, implemented using Prefect.
@@ -138,6 +144,7 @@ All tasks that perform network I/O or heavy computation should use caching.
 
 ```
 /bookmark-processor/
+|-- tests/              # Pytest test files
 |-- main.py             # Main entrypoint, contains flow definitions
 |-- models.py           # Pydantic data models
 |-- tasks/
@@ -146,7 +153,13 @@ All tasks that perform network I/O or heavy computation should use caching.
 |   |-- processing.py   # Contains content processing tasks (LLM, linting)
 |   |-- io.py           # Contains save_result task
 |-- bookmarks_input.json # Example input data
-|-- requirements.txt    # Project dependencies
+|-- pyproject.toml      # Project configuration for uv, ruff, and pytest
 |-- prefect.yaml        # Prefect deployment configuration (optional)
 ```
+
+## 7. Testing Strategy
+
+*   **Unit Tests:** Each task will be tested in isolation. For example, `extract_main_content` will be tested with sample HTML strings, and `lint_tags` will be tested with various tag lists.
+*   **Integration Tests:** The interaction between tasks within a flow will be tested. This will involve mocking external services. HTTP requests made with `httpx` will be mocked using the `respx` library, and LLM API calls will be mocked using `pytest-mock`.
+*   **Flow Tests:** The `liveness_flow` and `process_bookmark_flow` will be tested as units, using Prefect's testing utilities to run them synchronously and assert their outcomes against mock data.
 
