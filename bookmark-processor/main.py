@@ -168,6 +168,8 @@ def process_bookmark_flow(bookmark: Bookmark, blessed_tags_set: Set[str]) -> Boo
         logger.warning(f"Bookmark {bookmark.href} is not live. Skipping content processing.")
         # Even if not live, we still want to lint tags and save the bookmark
         _lint_and_filter_tags(bookmark, blessed_tags_set) # Passed blessed_tags_set
+        # Append "not-live" tag for bookmarks that failed all liveness checks
+        bookmark.tags.append("not-live")
         return bookmark
 
     # 2. Determine and extract text source for processing
