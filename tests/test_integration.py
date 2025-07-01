@@ -76,8 +76,10 @@ def test_process_all_bookmarks_flow_integration(tmp_path: Path, mocker, mock_liv
 
     # Mock Prefect tasks and flows
     mocker.patch("bookmark_processor.main.liveness_flow", return_value=mock_liveness_result)
-    mocker.patch("bookmark_processor.tasks.io.load_bookmarks", return_value=json.loads(TEST_BOOKMARKS_CONTENT))
-    mock_save_results = mocker.patch("bookmark_processor.tasks.io.save_results") # Capture the mock object
+    # Patch load_bookmarks where it's used in main.py
+    mocker.patch("bookmark_processor.main.load_bookmarks", return_value=json.loads(TEST_BOOKMARKS_CONTENT))
+    # Patch save_results where it's used in main.py
+    mock_save_results = mocker.patch("bookmark_processor.main.save_results") # Capture the mock object
     mocker.patch("bookmark_processor.tasks.processing.load_blessed_tags", return_value={"tech", "programming", "science"})
     mocker.patch("bookmark_processor.tasks.processing.extract_main_content", return_value="Test content about machine learning and AI.")
     mocker.patch("bookmark_processor.tasks.processing.summarize_content", return_value="A concise summary of test content.")
