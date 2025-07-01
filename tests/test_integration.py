@@ -13,15 +13,25 @@ TEST_OUTPUT_PATH = "tests/processed_bookmarks_output.json"
 TEST_BOOKMARKS_CONTENT = """
 [
     {
-        "url": "http://example.com/page1",
-        "title": "Example Page One",
-        "description": "A test page for integration.",
+        "href": "http://example.com/page1",
+        "description": "Example Page One",
+        "extended": "A test page for integration.",
+        "meta": "e6a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7",
+        "hash": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+        "time": "2023-01-01T10:00:00Z",
+        "shared": "yes",
+        "toread": "no",
         "tags": "tech, programming"
     },
     {
-        "url": "http://example.com/page2",
-        "title": "Example Page Two",
-        "description": "Another test page.",
+        "href": "http://example.com/page2",
+        "description": "Example Page Two",
+        "extended": "Another test page.",
+        "meta": "f1e2d3c4b5a69876543210fedcba9876",
+        "hash": "b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7",
+        "time": "2023-01-02T11:00:00Z",
+        "shared": "no",
+        "toread": "yes",
         "tags": "science"
     }
 ]
@@ -91,7 +101,7 @@ def test_process_all_bookmarks_flow_integration(tmp_path: Path, mocker, mock_liv
     # Check first bookmark
     b1 = processed_bookmarks_list[0]
     assert isinstance(b1, Bookmark)
-    assert b1.url == "http://example.com/page1"
+    assert b1.href == "http://example.com/page1" # Changed from url to href
     assert b1.liveness.is_live is True
     assert b1.extended_description == "A concise summary of test content."
     # Check tags: original + suggested, then linted
@@ -115,7 +125,7 @@ def test_process_all_bookmarks_flow_integration(tmp_path: Path, mocker, mock_liv
     # Check second bookmark
     b2 = processed_bookmarks_list[1]
     assert isinstance(b2, Bookmark)
-    assert b2.url == "http://example.com/page2"
+    assert b2.href == "http://example.com/page2" # Changed from url to href
     assert b2.liveness.is_live is True
     assert b2.extended_description == "A concise summary of test content."
     # Original: science. Suggested: machine-learning, ai, technology. Blessed: tech, programming, science
