@@ -26,7 +26,7 @@ TEST_BOOKMARKS_CONTENT = """
     {
         "href": "http://example.com/page2",
         "description": "Example Page Two",
-        "extended": "",
+        "extended": "This is a pre-existing extended description for page 2.",
         "meta": "f1e2d3c4b5a69876543210fedcba9876",
         "hash": "b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7",
         "time": "2023-01-02T11:00:00Z",
@@ -114,34 +114,23 @@ def test_process_all_bookmarks_flow_integration(tmp_path: Path, mocker): # Remov
     processed_bookmarks_list = args[0]
     assert len(processed_bookmarks_list) == 2
 
-    # Check first bookmark
+    # Check first bookmark (should be summarized)
     b1 = processed_bookmarks_list[0]
     assert isinstance(b1, Bookmark)
     assert b1.href == "http://example.com/page1"
-    assert b1.extended == "A concise summary of test content." # This assertion will now pass
+    assert b1.extended == "A concise summary of test content."
     # Check tags: original + suggested, then linted
     # Original: tech, programming. Suggested: machine-learning, ai, technology. Blessed: tech, programming, science
-    # Expected: tech, programming, machine-learning, ai, technology (before linting)
     # After linting with blessed_tags_set={"tech", "programming", "science"}:
-    # The mock lint_tags will filter based on the blessed set.
-    # The suggested tags "machine-learning", "ai", "technology" are NOT in the blessed set.
-    # So, the final tags should only be the original blessed ones.
-    # However, the mock for suggest_tags returns "machine-learning", "ai", "technology".
-    # The mock for lint_tags is `lambda tags, blessed: [t for t in tags if t in blessed]`.
-    # So, if the suggested tags are added, and then linted, they will be removed if not blessed.
-    # Let's refine the expected tags based on the mock linting.
-    # Initial: ["tech", "programming"]
-    # After suggest_tags: ["tech", "programming", "machine-learning", "ai", "technology"]
-    # After lint_tags (with blessed={"tech", "programming", "science"}):
     # Only "tech" and "programming" should remain.
     assert sorted(b1.tags) == sorted(["tech", "programming"])
 
 
-    # Check second bookmark
+    # Check second bookmark (should retain its original extended description)
     b2 = processed_bookmarks_list[1]
     assert isinstance(b2, Bookmark)
     assert b2.href == "http://example.com/page2"
-    assert b2.extended == "A concise summary of test content." # This assertion will now pass
+    assert b2.extended == "This is a pre-existing extended description for page 2."
     # Original: science. Suggested: machine-learning, ai, technology. Blessed: tech, programming, science
     # After linting: only "science" should remain.
     assert sorted(b2.tags) == sorted(["science"])
