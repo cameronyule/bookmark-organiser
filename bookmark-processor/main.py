@@ -1,15 +1,12 @@
-import json
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 import typer
 from prefect import flow, get_run_logger
-import pendulum # Import pendulum for timezone-aware datetime
 
 from models import Bookmark, LivenessResult
 from tasks.io import load_bookmarks, save_results
 from tasks.liveness import (
-    LivenessCheckFailed,
     attempt_get_request,
     attempt_head_request,
     attempt_headless_browser,
@@ -17,8 +14,8 @@ from tasks.liveness import (
 from tasks.processing import (
     extract_main_content,
     lint_tags,
-    summarize_content,
     suggest_tags,
+    summarize_content,
 )
 
 app = typer.Typer()
@@ -38,11 +35,12 @@ def _perform_head_check(url: str) -> Optional[LivenessResult]:
                 status_code=head_result["status_code"],
                 method="HEAD",
                 final_url=head_result["final_url"],
-                content=None
+                content=None,
             )
     except Exception as e:
         logger.warning(f"HEAD request failed for {url}: {e}")
     return None
+
 
 def _perform_get_check(url: str) -> Optional[LivenessResult]:
     """Attempts a GET request and returns LivenessResult if successful."""
@@ -58,11 +56,12 @@ def _perform_get_check(url: str) -> Optional[LivenessResult]:
                 status_code=get_result["status_code"],
                 method="GET",
                 final_url=get_result["final_url"],
-                content=get_result["content"]
+                content=get_result["content"],
             )
     except Exception as e:
         logger.warning(f"GET request failed for {url}: {e}")
     return None
+
 
 def _perform_headless_check(url: str) -> Optional[LivenessResult]:
     """Attempts a headless browser check and returns LivenessResult if successful."""
@@ -78,7 +77,7 @@ def _perform_headless_check(url: str) -> Optional[LivenessResult]:
                 status_code=headless_result["status_code"],
                 method="HEADLESS",
                 final_url=headless_result["final_url"],
-                content=headless_result["content"]
+                content=headless_result["content"],
             )
     except Exception as e:
         logger.warning(f"Headless browser failed for {url}: {e}")
@@ -108,7 +107,14 @@ def liveness_flow(url: str) -> LivenessResult:
         return headless_check_result
 
     logger.error(f"All liveness checks failed for URL: {url}")
-    return LivenessResult(url=url, is_live=False, status_code=None, method="NONE", final_url=None, content=None)
+    return LivenessResult(
+        url=url,
+        is_live=False,
+        status_code=None,
+        method="NONE",
+        final_url=None,
+        content=None,
+    )
 
 
 def _get_and_extract_content_source(bookmark: Bookmark, liveness_result: LivenessResult) -> Optional[str]:
@@ -122,7 +128,9 @@ def _get_and_extract_content_source(bookmark: Bookmark, liveness_result: Livenes
         logger.info("Extracting main content from fetched HTML via liveness check.")
         text_source = extract_main_content(liveness_result.content)
     else:
-        logger.warning(f"No content available from liveness check for {bookmark.href}. Attempting direct GET to fetch content.")
+        logger.warning(
+            f"No content available from liveness check for {bookmark.href}. Attempting direct GET to fetch content."
+        )
         try:
             get_result = attempt_get_request(bookmark.href)
             if get_result and get_result["content"]:
@@ -134,6 +142,7 @@ def _get_and_extract_content_source(bookmark: Bookmark, liveness_result: Livenes
             logger.error(f"Error during direct GET for {bookmark.href}: {e}")
     return text_source
 
+
 def _summarize_and_update_extended(bookmark: Bookmark, text_source: Optional[str]) -> None:
     """Summarizes content and updates bookmark.extended if conditions are met."""
     logger = get_run_logger()
@@ -141,6 +150,7 @@ def _summarize_and_update_extended(bookmark: Bookmark, text_source: Optional[str
         logger.info("Summarizing content for 'extended' description.")
         summary = summarize_content(text_source)
         bookmark.extended = summary
+
 
 def _suggest_and_add_new_tags(bookmark: Bookmark, text_source: Optional[str]) -> None:
     """Suggests new tags based on content and adds them to the bookmark."""
@@ -152,6 +162,7 @@ def _suggest_and_add_new_tags(bookmark: Bookmark, text_source: Optional[str]) ->
         all_tags.update(new_tags)
         bookmark.tags = sorted(list(all_tags))
         logger.info(f"Added new tags for {bookmark.href}: {new_tags}")
+
 
 def _lint_and_filter_tags(bookmark: Bookmark) -> None:
     """Lints existing tags and removes unblessed ones."""

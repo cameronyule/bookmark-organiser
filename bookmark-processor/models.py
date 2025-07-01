@@ -1,11 +1,10 @@
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator, ConfigDict
-import pendulum
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class Bookmark(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True) # Added for Pydantic v2+
+    model_config = ConfigDict(arbitrary_types_allowed=True)  # Added for Pydantic v2+
 
     href: str
     description: str
@@ -15,7 +14,7 @@ class Bookmark(BaseModel):
     time: str
     shared: str
     toread: str
-    tags: List[str] = Field(default_factory=list) # Default to empty list
+    tags: List[str] = Field(default_factory=list)  # Default to empty list
 
     @field_validator("tags", mode="before")
     @classmethod
@@ -26,7 +25,7 @@ class Bookmark(BaseModel):
 
 
 class LivenessResult(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True) # Added for Pydantic v2+
+    model_config = ConfigDict(arbitrary_types_allowed=True)  # Added for Pydantic v2+
 
     url: str
     is_live: bool

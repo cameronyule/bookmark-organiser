@@ -1,15 +1,19 @@
 import json
-from typing import List, Dict, Any
+from typing import List
+
 from prefect import task
+
 from models import Bookmark
+
 
 @task
 def load_bookmarks(filepath: str) -> List[dict]:
     """
     Loads bookmarks from a JSON file.
     """
-    with open(filepath, 'r', encoding='utf-8') as f:
+    with open(filepath, "r", encoding="utf-8") as f:
         return json.load(f)
+
 
 @task
 def save_results(results: List[Bookmark], filepath: str):
@@ -29,7 +33,7 @@ def save_results(results: List[Bookmark], filepath: str):
         "time",
         "shared",
         "toread",
-        "tags"
+        "tags",
     }
 
     for bookmark in results:
@@ -40,10 +44,10 @@ def save_results(results: List[Bookmark], filepath: str):
         # The 'tags' field is stored internally as a list of strings, but the
         # desired output format is a single space-delimited string.
         # We convert it back here before saving.
-        if 'tags' in bookmark_dict and isinstance(bookmark_dict['tags'], list):
-            bookmark_dict['tags'] = " ".join(bookmark_dict['tags'])
+        if "tags" in bookmark_dict and isinstance(bookmark_dict["tags"], list):
+            bookmark_dict["tags"] = " ".join(bookmark_dict["tags"])
 
         output_data.append(bookmark_dict)
 
-    with open(filepath, 'w', encoding='utf-8') as f:
+    with open(filepath, "w", encoding="utf-8") as f:
         json.dump(output_data, f, indent=2)

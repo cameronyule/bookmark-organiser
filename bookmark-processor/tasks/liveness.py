@@ -1,14 +1,12 @@
 from datetime import timedelta
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 import httpx
 from playwright.sync_api import sync_playwright
 from prefect import task
 from prefect.tasks import task_input_hash
 
-CACHE_SETTINGS = dict(
-    cache_key_fn=task_input_hash, cache_expiration=timedelta(days=7)
-)
+CACHE_SETTINGS = dict(cache_key_fn=task_input_hash, cache_expiration=timedelta(days=7))
 
 
 class LivenessCheckFailed(Exception):
@@ -28,7 +26,7 @@ def attempt_head_request(url: str) -> Optional[Dict[str, Any]]:
             response = client.head(url, timeout=10)
             response.raise_for_status()
             return {"final_url": str(response.url), "status_code": response.status_code}
-    except httpx.RequestError as e:
+    except httpx.RequestError:
         # Log the error but don't raise, allow fallback
         return None
 
@@ -48,7 +46,7 @@ def attempt_get_request(url: str) -> Optional[Dict[str, Any]]:
                 "content": response.text,
                 "status_code": response.status_code,
             }
-    except httpx.RequestError as e:
+    except httpx.RequestError:
         # Log the error but don't raise, allow fallback
         return None
 
@@ -67,7 +65,7 @@ def attempt_headless_browser(url: str) -> Optional[Dict[str, Any]]:
                 response = page.goto(url, wait_until="domcontentloaded", timeout=60000)
                 content = page.content()
                 final_url = page.url
-                status_code = response.status() if response else None # Get status code from response
+                status_code = response.status() if response else None  # Get status code from response
             finally:
                 browser.close()
             return {
@@ -75,7 +73,6 @@ def attempt_headless_browser(url: str) -> Optional[Dict[str, Any]]:
                 "content": content,
                 "status_code": status_code,
             }
-    except Exception as e:
+    except Exception:
         # Catch any Playwright or other exceptions and return None
         return None
-

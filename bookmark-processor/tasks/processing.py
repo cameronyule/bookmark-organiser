@@ -6,9 +6,7 @@ from bs4 import BeautifulSoup
 from prefect import task
 from prefect.tasks import task_input_hash
 
-CACHE_SETTINGS = dict(
-    cache_key_fn=task_input_hash, cache_expiration=timedelta(days=7)
-)
+CACHE_SETTINGS = dict(cache_key_fn=task_input_hash, cache_expiration=timedelta(days=7))
 
 
 @task(**CACHE_SETTINGS)
@@ -43,6 +41,7 @@ def lint_tags(tags: List[str], blessed_tags_path: str = "blessed_tags.txt") -> L
     Log warnings for tags that are not in the list.
     """
     from prefect import get_run_logger
+
     logger = get_run_logger()
 
     try:
@@ -50,7 +49,7 @@ def lint_tags(tags: List[str], blessed_tags_path: str = "blessed_tags.txt") -> L
             blessed_tags = {line.strip() for line in f if line.strip()}
     except FileNotFoundError:
         logger.warning(f"Could not find blessed tags file at: {blessed_tags_path}. No tag linting performed.")
-        return tags # Return original tags if blessed file not found
+        return tags  # Return original tags if blessed file not found
 
     linted_tags = []
     for tag in tags:
@@ -98,4 +97,3 @@ def suggest_tags(text: str) -> List[str]:
     )
     response = model.prompt(prompt)
     return response.text().strip().lower().split()
-
