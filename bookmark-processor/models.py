@@ -1,10 +1,12 @@
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 import pendulum
 
 
 class Bookmark(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True) # Added for Pydantic v2+
+
     href: str
     description: str
     extended: str = ""  # Default to empty string
@@ -32,9 +34,11 @@ class Bookmark(BaseModel):
 
 
 class LivenessResult(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True) # Added for Pydantic v2+
+
     url: str
     is_live: bool
     status_code: Optional[int] = None
     method: Literal["HEAD", "GET", "HEADLESS", "NONE", "ERROR"]
-    final_url: Optional[str] = None # Re-added
-    content: Optional[str] = None # Re-added
+    final_url: Optional[str] = None
+    content: Optional[str] = None
