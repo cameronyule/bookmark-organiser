@@ -81,18 +81,19 @@ class LivenessResult(BaseModel):
   * **Decorator:** `@flow(name="Process All Bookmarks", task_runner=ConcurrentTaskRunner())`
   * **Input:** `bookmarks_filepath: str`, `output_filepath: str`
   * **Logic:**
-    1.  Read the bookmarks from the input JSON file into a list of `Bookmark` models.
-    2.  Submit a `process_bookmark_flow` run for each bookmark, collecting the future results.
-    3.  Gather the results (the modified `Bookmark` objects) from all completed subflow runs.
-    4.  Call `save_results(bookmarks, output_filepath)` to write all processed bookmarks to the output file.
+    1.  **Load blessed tags once** from `blessed_tags.txt` using `load_blessed_tags` task.
+    2.  Read the bookmarks from the input JSON file into a list of `Bookmark` models.
+    3.  Submit a `process_bookmark_flow` run for each bookmark, passing the loaded blessed tags, and collecting the future results.
+    4.  Gather the results (the modified `Bookmark` objects) from all completed subflow runs.
+    5.  Call `save_results(bookmarks, output_filepath)` to write all processed bookmarks to the output file.
 
 ### 5.2. Bookmark Subflow: `process_bookmark_flow`
 
   * **Decorator:** `@flow(name="Process Single Bookmark")`
-  * **Input:** `bookmark: Bookmark`
+  * **Input:** `bookmark: Bookmark`, `blessed_tags_set: Set[str]`
   * **Output:** `Bookmark` (the modified bookmark)
   * **Logic:**
-    1.  Call `lint_tags(bookmark.tags)` and log any warnings.
+    1.  Call `lint_tags(bookmark.tags, blessed_tags_set)` and log any warnings.
     2.  Call `liveness_flow(bookmark.href)`.
     3.  If `liveness_flow` fails (returns `is_live=False`):
         *   Add `"not-live"` to `bookmark.tags` if not already present.
@@ -122,6 +123,9 @@ class LivenessResult(BaseModel):
 All tasks that perform network I/O or heavy computation should use caching.
 `CACHE_SETTINGS = dict(cache_key_fn=task_input_hash, cache_expiration=timedelta(days=7))`
 
+  * **`load_blessed_tags(blessed_tags_path: str) -> Set[str]`**
+      * Decorator: `@task`
+      * Action: Reads `blessed_tags.txt` and returns a `set` of blessed tags. Handles `FileNotFoundError`.
   * **`attempt_get_request(url: str) -> dict`**
       * Decorator: `@task(retries=2, retry_delay_seconds=10, **CACHE_SETTINGS)`
       * Action: Use `httpx` to make a `GET` request. Return a dict `{"final_url": str, "content": str, "status_code": int}`.
@@ -131,9 +135,9 @@ All tasks that perform network I/O or heavy computation should use caching.
   * **`extract_main_content(html_content: str) -> str`**
       * Decorator: `@task(**CACHE_SETTINGS)`
       * Action: Use `BeautifulSoup` to parse HTML and implement logic to extract the core article text, stripping out boilerplate like navbars, ads, and footers.
-  * **`lint_tags(tags: List[str]) -> List[str]`**
+  * **`lint_tags(tags: List[str], blessed_tags: Set[str]) -> List[str]`**
       * Decorator: `@task` (No caching needed, it's fast).
-      * Action: Compare input tags against a "blessed" list read from `blessed_tags.txt`. Return a list of warnings for tags that are not in the list.
+      * Action: Compare input tags against a "blessed" set provided as an argument. Return a list of tags that are in the set.
   * **`summarize_content(text: str) -> str`**
       * Decorator: `@task(**CACHE_SETTINGS)`
       * Action: Call the LLM API (via `llm` library) with the text to generate a summary.

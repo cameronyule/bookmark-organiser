@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Set
 
 import typer
 from prefect import flow, get_run_logger
@@ -13,14 +13,12 @@ from tasks.liveness import (
 from tasks.processing import (
     extract_main_content,
     lint_tags,
+    load_blessed_tags, # Added import
     suggest_tags,
     summarize_content,
 )
 
 app = typer.Typer()
-
-
-# Removed _perform_head_check function
 
 
 def _perform_get_check(url: str) -> Optional[LivenessResult]:
@@ -140,18 +138,18 @@ def _suggest_and_add_new_tags(bookmark: Bookmark, text_source: Optional[str]) ->
         logger.info(f"Added new tags for {bookmark.href}: {new_tags}")
 
 
-def _lint_and_filter_tags(bookmark: Bookmark) -> None:
+def _lint_and_filter_tags(bookmark: Bookmark, blessed_tags_set: Set[str]) -> None: # Modified signature
     """Lints existing tags and removes unblessed ones."""
     logger = get_run_logger()
     initial_tags = bookmark.tags
-    bookmark.tags = lint_tags(bookmark.tags)
+    bookmark.tags = lint_tags(bookmark.tags, blessed_tags_set) # Passed blessed_tags_set
     removed_tags = set(initial_tags) - set(bookmark.tags)
     if removed_tags:
         logger.info(f"Removed unblessed tags for {bookmark.href}: {list(removed_tags)}")
 
 
 @flow(name="Process Single Bookmark")
-def process_bookmark_flow(bookmark: Bookmark) -> Bookmark:
+def process_bookmark_flow(bookmark: Bookmark, blessed_tags_set: Set[str]) -> Bookmark: # Modified signature
     """
     Processes a single bookmark: checks liveness, extracts content, summarizes, and suggests tags.
     """
@@ -169,7 +167,7 @@ def process_bookmark_flow(bookmark: Bookmark) -> Bookmark:
     if not liveness_result.is_live:
         logger.warning(f"Bookmark {bookmark.href} is not live. Skipping content processing.")
         # Even if not live, we still want to lint tags and save the bookmark
-        _lint_and_filter_tags(bookmark)
+        _lint_and_filter_tags(bookmark, blessed_tags_set) # Passed blessed_tags_set
         return bookmark
 
     # 2. Determine and extract text source for processing
@@ -182,7 +180,7 @@ def process_bookmark_flow(bookmark: Bookmark) -> Bookmark:
     _suggest_and_add_new_tags(bookmark, text_source)
 
     # 5. Lint Tags
-    _lint_and_filter_tags(bookmark)
+    _lint_and_filter_tags(bookmark, blessed_tags_set) # Passed blessed_tags_set
 
     logger.info(f"Finished processing bookmark: {bookmark.href}")
     return bookmark
@@ -200,9 +198,12 @@ def process_all_bookmarks_flow(bookmarks_filepath: str, output_filepath: str):
     bookmarks = [Bookmark.model_validate(item) for item in data]
     logger.info(f"Found {len(bookmarks)} bookmarks to process.")
 
+    # Load blessed tags once
+    blessed_tags_set = load_blessed_tags("blessed_tags.txt") # Loaded once
+
     # Process each bookmark as a subflow.
     # With the default SequentialTaskRunner, these will run one after another.
-    results = [process_bookmark_flow(b) for b in bookmarks]
+    results = [process_bookmark_flow(b, blessed_tags_set) for b in bookmarks] # Passed blessed_tags_set
     logger.info("All subflows completed.")
 
     logger.info(f"Saving {len(results)} processed bookmarks to {output_filepath}")

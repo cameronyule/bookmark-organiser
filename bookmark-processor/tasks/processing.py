@@ -1,5 +1,5 @@
 from datetime import timedelta
-from typing import List
+from typing import List, Set
 
 import llm
 from bs4 import BeautifulSoup
@@ -7,6 +7,23 @@ from prefect import task
 from prefect.tasks import task_input_hash
 
 CACHE_SETTINGS = dict(cache_key_fn=task_input_hash, cache_expiration=timedelta(days=7))
+
+
+@task
+def load_blessed_tags(blessed_tags_path: str = "blessed_tags.txt") -> Set[str]:
+    """
+    Loads the set of blessed tags from a file.
+    """
+    from prefect import get_run_logger
+    logger = get_run_logger()
+    try:
+        with open(blessed_tags_path) as f:
+            blessed_tags = {line.strip() for line in f if line.strip()}
+        logger.info(f"Loaded {len(blessed_tags)} blessed tags from {blessed_tags_path}")
+        return blessed_tags
+    except FileNotFoundError:
+        logger.warning(f"Could not find blessed tags file at: {blessed_tags_path}. Tag linting will not be performed.")
+        return set() # Return an empty set if file not found
 
 
 @task(**CACHE_SETTINGS)
@@ -34,22 +51,19 @@ def extract_main_content(html_content: str) -> str:
 
 
 @task
-def lint_tags(tags: List[str], blessed_tags_path: str = "blessed_tags.txt") -> List[str]:
+def lint_tags(tags: List[str], blessed_tags: Set[str]) -> List[str]:
     """
-    Compare input tags against a "blessed" list read from blessed_tags.txt.
-    Return a list of tags that are in the blessed list.
-    Log warnings for tags that are not in the list.
+    Compare input tags against a "blessed" set.
+    Return a list of tags that are in the blessed set.
+    Log warnings for tags that are not in the set.
     """
     from prefect import get_run_logger
 
     logger = get_run_logger()
 
-    try:
-        with open(blessed_tags_path) as f:
-            blessed_tags = {line.strip() for line in f if line.strip()}
-    except FileNotFoundError:
-        logger.warning(f"Could not find blessed tags file at: {blessed_tags_path}. No tag linting performed.")
-        return tags  # Return original tags if blessed file not found
+    if not blessed_tags:
+        logger.warning("No blessed tags provided. No tag linting performed.")
+        return tags # Return original tags if no blessed tags are available
 
     linted_tags = []
     for tag in tags:
