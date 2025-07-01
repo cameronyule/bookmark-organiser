@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import typer
 from prefect import flow, get_run_logger
@@ -86,6 +86,58 @@ def liveness_flow(url: str) -> LivenessResult:
     return LivenessResult(url=url, is_live=False, status_code=None, method="NONE", final_url=None, content=None)
 
 
+def _get_and_extract_content_source(bookmark: Bookmark, liveness_result: LivenessResult) -> Optional[str]:
+    """Determines the primary text source for processing (extended, fetched HTML, or direct GET)."""
+    logger = get_run_logger()
+    text_source = None
+    if bookmark.extended:
+        text_source = bookmark.extended
+        logger.info("Using existing 'extended' description as text source.")
+    elif liveness_result.content:
+        logger.info("Extracting main content from fetched HTML via liveness check.")
+        text_source = extract_main_content(liveness_result.content)
+    else:
+        logger.warning(f"No content available from liveness check for {bookmark.href}. Attempting direct GET to fetch content.")
+        try:
+            get_result = attempt_get_request(bookmark.href)
+            if get_result and get_result["content"]:
+                text_source = extract_main_content(get_result["content"])
+                logger.info(f"Direct GET successful for {bookmark.href}.")
+            else:
+                logger.warning(f"Direct GET failed to retrieve content for {bookmark.href}.")
+        except Exception as e:
+            logger.error(f"Error during direct GET for {bookmark.href}: {e}")
+    return text_source
+
+def _summarize_and_update_extended(bookmark: Bookmark, text_source: Optional[str]) -> None:
+    """Summarizes content and updates bookmark.extended if conditions are met."""
+    logger = get_run_logger()
+    if text_source and not bookmark.extended:
+        logger.info("Summarizing content for 'extended' description.")
+        summary = summarize_content(text_source)
+        bookmark.extended = summary
+
+def _suggest_and_add_new_tags(bookmark: Bookmark, text_source: Optional[str]) -> None:
+    """Suggests new tags based on content and adds them to the bookmark."""
+    logger = get_run_logger()
+    if text_source:
+        logger.info("Suggesting new tags.")
+        new_tags = suggest_tags(text_source)
+        all_tags = set(bookmark.tags)
+        all_tags.update(new_tags)
+        bookmark.tags = sorted(list(all_tags))
+        logger.info(f"Added new tags for {bookmark.href}: {new_tags}")
+
+def _lint_and_filter_tags(bookmark: Bookmark) -> None:
+    """Lints existing tags and removes unblessed ones."""
+    logger = get_run_logger()
+    initial_tags = bookmark.tags
+    bookmark.tags = lint_tags(bookmark.tags)
+    removed_tags = set(initial_tags) - set(bookmark.tags)
+    if removed_tags:
+        logger.info(f"Removed unblessed tags for {bookmark.href}: {list(removed_tags)}")
+
+
 @flow(name="Process Single Bookmark")
 def process_bookmark_flow(bookmark: Bookmark) -> Bookmark:
     """
@@ -105,58 +157,20 @@ def process_bookmark_flow(bookmark: Bookmark) -> Bookmark:
     if not liveness_result.is_live:
         logger.warning(f"Bookmark {bookmark.href} is not live. Skipping content processing.")
         # Even if not live, we still want to lint tags and save the bookmark
-        initial_tags = bookmark.tags
-        bookmark.tags = lint_tags(bookmark.tags) # Lint existing tags
-        removed_tags = set(initial_tags) - set(bookmark.tags)
-        if removed_tags:
-            logger.info(f"Removed unblessed tags for {bookmark.href}: {list(removed_tags)}")
+        _lint_and_filter_tags(bookmark)
         return bookmark
 
-    # 2. Determine text source for processing
-    text_source = None # This variable will hold the extracted content temporarily
-    if bookmark.extended:
-        text_source = bookmark.extended
-        logger.info("Using existing 'extended' description as text source.")
-    elif liveness_result.content: # Use content from liveness check if available
-        logger.info("Extracting main content from fetched HTML via liveness check.")
-        text_source = extract_main_content(liveness_result.content)
-    else:
-        logger.warning(f"No content available from liveness check for {bookmark.href}. Attempting direct GET to fetch content.")
-        # Fallback to direct GET if liveness_result didn't provide content (e.g., HEAD success)
-        try:
-            get_result = attempt_get_request(bookmark.href)
-            if get_result and get_result["content"]:
-                text_source = extract_main_content(get_result["content"])
-                logger.info(f"Direct GET successful for {bookmark.href}.")
-            else:
-                logger.warning(f"Direct GET failed to retrieve content for {bookmark.href}.")
-        except Exception as e:
-            logger.error(f"Error during direct GET for {bookmark.href}: {e}")
+    # 2. Determine and extract text source for processing
+    text_source = _get_and_extract_content_source(bookmark, liveness_result)
 
-    # 3. Summarize Content (only if content exists and no existing extended description)
-    if text_source and not bookmark.extended:
-        logger.info("Summarizing content for 'extended' description.")
-        summary = summarize_content(text_source) # This variable will hold the summary temporarily
-        bookmark.extended = summary # Update 'extended' as per original logic
+    # 3. Summarize Content
+    _summarize_and_update_extended(bookmark, text_source)
 
-    # 4. Suggest Tags
-    if text_source:
-        logger.info("Suggesting new tags.")
-        new_tags = suggest_tags(text_source)
-        # Combine existing tags with suggested tags, ensuring uniqueness
-        all_tags = set(bookmark.tags)
-        all_tags.update(new_tags)
-        bookmark.tags = sorted(list(all_tags))
-        logger.info(f"Added new tags for {bookmark.href}: {new_tags}")
+    # 4. Suggest and add new Tags
+    _suggest_and_add_new_tags(bookmark, text_source)
 
-    # 5. Lint Tags (using blessed_tags.txt)
-    # This will filter tags and return only blessed ones.
-    initial_tags = bookmark.tags # Keep a copy to log removed tags
-    bookmark.tags = lint_tags(bookmark.tags)
-    removed_tags = set(initial_tags) - set(bookmark.tags)
-    if removed_tags:
-        logger.info(f"Removed unblessed tags for {bookmark.href}: {list(removed_tags)}")
-
+    # 5. Lint Tags
+    _lint_and_filter_tags(bookmark)
 
     logger.info(f"Finished processing bookmark: {bookmark.href}")
     return bookmark
