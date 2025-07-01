@@ -158,6 +158,7 @@ def process_bookmark_flow(bookmark: Bookmark, blessed_tags_set: Set[str]) -> Boo
 
     # 1. Check URL Liveness
     liveness_result = liveness_flow(bookmark.href)
+    # Removed: bookmark.liveness = liveness_result # Assign the liveness result to the bookmark
 
     # Update bookmark href to final URL if redirect occurred
     if liveness_result.final_url and liveness_result.final_url != bookmark.href:
