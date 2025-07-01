@@ -8,7 +8,6 @@ from models import Bookmark, LivenessResult
 from tasks.io import load_bookmarks, save_results
 from tasks.liveness import (
     attempt_get_request,
-    attempt_head_request,
     attempt_headless_browser,
 )
 from tasks.processing import (
@@ -21,25 +20,7 @@ from tasks.processing import (
 app = typer.Typer()
 
 
-def _perform_head_check(url: str) -> Optional[LivenessResult]:
-    """Attempts a HEAD request and returns LivenessResult if successful."""
-    logger = get_run_logger()
-    try:
-        logger.info(f"Attempting HEAD request for {url}")
-        head_result = attempt_head_request(url)
-        if head_result:
-            logger.info(f"HEAD success for {url}, status: {head_result['status_code']}")
-            return LivenessResult(
-                url=url,
-                is_live=True,
-                status_code=head_result["status_code"],
-                method="HEAD",
-                final_url=head_result["final_url"],
-                content=None,
-            )
-    except Exception as e:
-        logger.warning(f"HEAD request failed for {url}: {e}")
-    return None
+# Removed _perform_head_check function
 
 
 def _perform_get_check(url: str) -> Optional[LivenessResult]:
@@ -87,16 +68,11 @@ def _perform_headless_check(url: str) -> Optional[LivenessResult]:
 @flow(name="Check URL Liveness")
 def liveness_flow(url: str) -> LivenessResult:
     """
-    Checks the liveness of a given URL using a fallback chain: HEAD -> GET -> Headless.
+    Checks the liveness of a given URL using a fallback chain: GET -> Headless.
     """
     logger = get_run_logger()
 
-    # Attempt HEAD request first
-    head_check_result = _perform_head_check(url)
-    if head_check_result:
-        return head_check_result
-
-    # Attempt GET request
+    # Attempt GET request first
     get_check_result = _perform_get_check(url)
     if get_check_result:
         return get_check_result

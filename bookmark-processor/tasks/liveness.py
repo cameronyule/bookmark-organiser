@@ -9,26 +9,7 @@ from prefect.tasks import task_input_hash
 CACHE_SETTINGS = dict(cache_key_fn=task_input_hash, cache_expiration=timedelta(days=7))
 
 
-class LivenessCheckFailed(Exception):
-    """Custom exception to signal a URL is not live."""
-
-    pass
-
-
-@task(retries=2, retry_delay_seconds=5, **CACHE_SETTINGS)
-def attempt_head_request(url: str) -> Optional[Dict[str, Any]]:
-    """
-    Use httpx to make a HEAD request. Follow redirects. Return final URL and status code.
-    Returns None if the request fails.
-    """
-    try:
-        with httpx.Client(follow_redirects=True) as client:
-            response = client.head(url, timeout=10)
-            response.raise_for_status()
-            return {"final_url": str(response.url), "status_code": response.status_code}
-    except httpx.RequestError:
-        # Log the error but don't raise, allow fallback
-        return None
+# Removed LivenessCheckFailed exception as it's no longer used
 
 
 @task(retries=2, retry_delay_seconds=10, **CACHE_SETTINGS)

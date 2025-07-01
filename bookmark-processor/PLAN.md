@@ -11,7 +11,7 @@ The pipeline must be idempotent and resumable to handle interruptions, especiall
 The implementation will be in **Python 3.10+** and will leverage the following core libraries:
 
 * **Workflow Orchestration:** `prefect` (version 2.x) - To define, orchestrate, and observe the workflow. Its declarative features for retries, caching, and concurrency are central to this plan.
-* **HTTP Requests:** `httpx` - For performing synchronous and asynchronous HTTP HEAD/GET requests.
+* **HTTP Requests:** `httpx` - For performing synchronous and asynchronous HTTP GET requests.
 * **Headless Browser:** `playwright` - For the final fallback in the liveness check, capable of rendering JavaScript-heavy pages.
 * **Data Validation:** `pydantic` - To define clear, type-hinted data models for inputs, outputs, and intermediate states.
 * **Content Extraction:** `beautifulsoup4` with `lxml` - To parse HTML and extract the main textual content from a webpage before sending it to an LLM.
@@ -35,7 +35,7 @@ The architecture is based on a **Stateful, Idempotent Worker** pattern, implemen
 
 1.  **Top-Level Flow (`process_all_bookmarks_flow`):** This flow will orchestrate the entire process. It will read the list of all bookmarks and trigger a separate subflow for each one. It will use Prefect's `ConcurrentTaskRunner` to process multiple bookmarks in parallel.
 2.  **Bookmark Subflow (`process_bookmark_flow`):** This flow represents the Directed Acyclic Graph (DAG) of operations for a *single* bookmark. It is responsible for calling the individual tasks in the correct order.
-3.  **Liveness Check Subflow (`liveness_flow`):** To handle the complex, multi-stage liveness check, a dedicated subflow will be created. This encapsulates the "HEAD -> GET -> Headless" fallback logic, keeping the main bookmark flow clean.
+3.  **Liveness Check Subflow (`liveness_flow`):** To handle the complex, multi-stage liveness check, a dedicated subflow will be created. This encapsulates the "GET -> Headless" fallback logic, keeping the main bookmark flow clean.
 4.  **Atomic Tasks (`@task`):** Each individual action (e.g., making a single HTTP request, calling an LLM) will be implemented as a distinct Prefect `@task`. This allows us to apply specific configurations for **retries, timeouts, and caching** to each action. Caching is critical for idempotency and efficiency on re-runs.
 
 ## 4. Data Models
@@ -68,7 +68,7 @@ class Bookmark(BaseModel):
 
 class LivenessResult(BaseModel):
     status: Literal["success", "failed"]
-    method: Optional[Literal["head_then_get", "get", "headless"]] = None
+    method: Optional[Literal["get", "headless"]] = None # Updated methods
     final_url: Optional[str] = None
     content: Optional[str] = None # HTML content
     error_message: Optional[str] = None
@@ -94,7 +94,7 @@ class LivenessResult(BaseModel):
   * **Logic:**
     1.  Call `lint_tags(bookmark.tags)` and log any warnings.
     2.  Call `liveness_flow(bookmark.href)`.
-    3.  If `liveness_flow` fails (raises `LivenessCheckFailed`):
+    3.  If `liveness_flow` fails (returns `is_live=False`):
         *   Add `"not-live"` to `bookmark.tags` if not already present.
         *   Return the `bookmark`.
     4.  If `liveness_flow` succeeds, it returns a `LivenessResult`.
@@ -109,31 +109,25 @@ class LivenessResult(BaseModel):
   * **Input:** `url: str`
   * **Output:** `LivenessResult`
   * **Logic (Fallback Chain):**
-    1.  **Try HEAD:**
-          * `try`: Call `attempt_head_request(url)`. On success, call `attempt_get_request` with the final redirected URL to get content. Return a `LivenessResult` with `status="success"` and `method="head_then_get"`.
-          * `except Exception`: Log the failure and proceed to the next step.
-    2.  **Try GET:**
-          * `try`: Call `attempt_get_request(url)`. On success, return a `LivenessResult` with `status="success"` and `method="get"`.
+    1.  **Try GET:**
+          * `try`: Call `attempt_get_request(url)`. On success, return a `LivenessResult` with `is_live=True` and `method="GET"`.
           * `except Exception`: Log the failure and proceed.
-    3.  **Try Headless:**
-          * `try`: Call `attempt_headless_browser(url)`. On success, return a `LivenessResult` with `status="success"` and `method="headless"`.
+    2.  **Try Headless:**
+          * `try`: Call `attempt_headless_browser(url)`. On success, return a `LivenessResult` with `is_live=True` and `method="HEADLESS"`.
           * `except Exception`: Log the failure.
-    4.  If all methods fail, `raise LivenessCheckFailed("...")` to signal total failure to the parent flow.
+    3.  If all methods fail, return a `LivenessResult` with `is_live=False` and `method="NONE"`.
 
 ### 5.4. Individual Task Definitions (`@task`)
 
 All tasks that perform network I/O or heavy computation should use caching.
 `CACHE_SETTINGS = dict(cache_key_fn=task_input_hash, cache_expiration=timedelta(days=7))`
 
-  * **`attempt_head_request(url: str) -> str`**
-      * Decorator: `@task(retries=2, retry_delay_seconds=5, **CACHE_SETTINGS)`
-      * Action: Use `httpx` to make a `HEAD` request. Follow redirects. Return the final URL.
   * **`attempt_get_request(url: str) -> dict`**
       * Decorator: `@task(retries=2, retry_delay_seconds=10, **CACHE_SETTINGS)`
-      * Action: Use `httpx` to make a `GET` request. Return a dict `{"final_url": str, "content": str}`.
+      * Action: Use `httpx` to make a `GET` request. Return a dict `{"final_url": str, "content": str, "status_code": int}`.
   * **`attempt_headless_browser(url: str) -> dict`**
       * Decorator: `@task(retries=1, retry_delay_seconds=30, **CACHE_SETTINGS)`
-      * Action: Use `playwright` to load the page. Return a dict `{"final_url": str, "content": str}`.
+      * Action: Use `playwright` to load the page. Return a dict `{"final_url": str, "content": str, "status_code": int}`.
   * **`extract_main_content(html_content: str) -> str`**
       * Decorator: `@task(**CACHE_SETTINGS)`
       * Action: Use `BeautifulSoup` to parse HTML and implement logic to extract the core article text, stripping out boilerplate like navbars, ads, and footers.
@@ -200,4 +194,3 @@ uv run bookmark-processor [OPTIONS] INPUT_FILE OUTPUT_FILE
 ```bash
 uv run bookmark-processor bookmarks_input.json processed_bookmarks.json
 ```
-
