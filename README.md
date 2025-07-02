@@ -1,4 +1,4 @@
-# bookmarks-organiser
+# bookmark-organiser
 
 A personal utility to organise my [Pinboard](https://pinboard.in) bookmarks.
 
