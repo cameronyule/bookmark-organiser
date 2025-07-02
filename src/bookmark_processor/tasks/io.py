@@ -22,8 +22,7 @@ def save_results(results: List[Bookmark], filepath: str):
     matches the desired input schema format.
     """
     output_data = []
-    # Define the fields that should be EXPLICITLY INCLUDED in the output JSON.
-    # This makes the output schema resilient to new fields added to the Bookmark model.
+
     fields_to_include = {
         "href",
         "description",
@@ -37,13 +36,8 @@ def save_results(results: List[Bookmark], filepath: str):
     }
 
     for bookmark in results:
-        # Convert Bookmark model to a dictionary, including only the specified fields.
-        # Pydantic v2's model_dump() method with the 'include' parameter is used here.
         bookmark_dict = bookmark.model_dump(include=fields_to_include)
 
-        # The 'tags' field is stored internally as a list of strings, but the
-        # desired output format is a single space-delimited string.
-        # We convert it back here before saving.
         if "tags" in bookmark_dict and isinstance(bookmark_dict["tags"], list):
             bookmark_dict["tags"] = " ".join(bookmark_dict["tags"])
 

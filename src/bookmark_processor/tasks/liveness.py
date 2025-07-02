@@ -9,9 +9,6 @@ from prefect.tasks import task_input_hash
 CACHE_SETTINGS = dict(cache_key_fn=task_input_hash, cache_expiration=timedelta(days=7))
 
 
-# Removed LivenessCheckFailed exception as it's no longer used
-
-
 @task(retries=2, retry_delay_seconds=10, **CACHE_SETTINGS)
 def attempt_get_request(url: str) -> Optional[Dict[str, Any]]:
     """
@@ -28,7 +25,6 @@ def attempt_get_request(url: str) -> Optional[Dict[str, Any]]:
                 "status_code": response.status_code,
             }
     except httpx.RequestError:
-        # Log the error but don't raise, allow fallback
         return None
 
 
@@ -46,9 +42,7 @@ def attempt_headless_browser(url: str) -> Optional[Dict[str, Any]]:
                 response = page.goto(url, wait_until="domcontentloaded", timeout=60000)
                 content = page.content()
                 final_url = page.url
-                status_code = (
-                    response.status() if response else None
-                )  # Get status code from response
+                status_code = response.status() if response else None
             finally:
                 browser.close()
             return {
@@ -57,5 +51,4 @@ def attempt_headless_browser(url: str) -> Optional[Dict[str, Any]]:
                 "status_code": status_code,
             }
     except Exception:
-        # Catch any Playwright or other exceptions and return None
         return None

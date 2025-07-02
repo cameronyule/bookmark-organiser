@@ -13,7 +13,7 @@ from bookmark_processor.tasks.liveness import (
 from bookmark_processor.tasks.processing import (
     extract_main_content,
     lint_tags,
-    load_blessed_tags,  # Added import
+    load_blessed_tags,
     suggest_tags,
     summarize_content,
 )
@@ -146,24 +146,18 @@ def _suggest_and_add_new_tags(bookmark: Bookmark, text_source: Optional[str]) ->
         logger.info(f"Added new tags for {bookmark.href}: {new_tags}")
 
 
-def _lint_and_filter_tags(
-    bookmark: Bookmark, blessed_tags_set: Set[str]
-) -> None:  # Modified signature
+def _lint_and_filter_tags(bookmark: Bookmark, blessed_tags_set: Set[str]) -> None:
     """Lints existing tags and removes unblessed ones."""
     logger = get_run_logger()
     initial_tags = bookmark.tags
-    bookmark.tags = lint_tags(
-        bookmark.tags, blessed_tags_set
-    )  # Passed blessed_tags_set
+    bookmark.tags = lint_tags(bookmark.tags, blessed_tags_set)
     removed_tags = set(initial_tags) - set(bookmark.tags)
     if removed_tags:
         logger.info(f"Removed unblessed tags for {bookmark.href}: {list(removed_tags)}")
 
 
 @flow(name="Process Single Bookmark")
-def process_bookmark_flow(
-    bookmark: Bookmark, blessed_tags_set: Set[str]
-) -> Bookmark:  # Modified signature
+def process_bookmark_flow(bookmark: Bookmark, blessed_tags_set: Set[str]) -> Bookmark:
     """
     Processes a single bookmark: checks liveness, extracts content, summarizes, and suggests tags.
     """
@@ -172,7 +166,6 @@ def process_bookmark_flow(
 
     # 1. Check URL Liveness
     liveness_result = liveness_flow(bookmark.href)
-    # Removed: bookmark.liveness = liveness_result # Assign the liveness result to the bookmark
 
     # Update bookmark href to final URL if redirect occurred
     if liveness_result.final_url and liveness_result.final_url != bookmark.href:
@@ -199,7 +192,7 @@ def process_bookmark_flow(
     _suggest_and_add_new_tags(bookmark, text_source)
 
     # 5. Lint Tags
-    _lint_and_filter_tags(bookmark, blessed_tags_set)  # Passed blessed_tags_set
+    _lint_and_filter_tags(bookmark, blessed_tags_set)
 
     logger.info(f"Finished processing bookmark: {bookmark.href}")
     return bookmark
@@ -217,8 +210,7 @@ def process_all_bookmarks_flow(bookmarks_filepath: str, output_filepath: str):
     bookmarks = [Bookmark.model_validate(item) for item in data]
     logger.info(f"Found {len(bookmarks)} bookmarks to process.")
 
-    # Load blessed tags once
-    blessed_tags_set = load_blessed_tags("config/blessed_tags.txt")  # Loaded once
+    blessed_tags_set = load_blessed_tags("config/blessed_tags.txt")
 
     # Process each bookmark as a subflow.
     # With the default SequentialTaskRunner, these will run one after another.
