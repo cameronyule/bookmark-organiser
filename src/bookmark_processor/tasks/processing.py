@@ -10,7 +10,7 @@ CACHE_SETTINGS = dict(cache_key_fn=task_input_hash, cache_expiration=timedelta(d
 
 
 @task
-def load_blessed_tags(blessed_tags_path: str = "blessed_tags.txt") -> Set[str]:
+def load_blessed_tags(blessed_tags_path: str = "config/blessed_tags.txt") -> Set[str]:
     """
     Loads the set of blessed tags from a file.
     """

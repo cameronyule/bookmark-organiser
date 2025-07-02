@@ -218,7 +218,7 @@ def process_all_bookmarks_flow(bookmarks_filepath: str, output_filepath: str):
     logger.info(f"Found {len(bookmarks)} bookmarks to process.")
 
     # Load blessed tags once
-    blessed_tags_set = load_blessed_tags("blessed_tags.txt")  # Loaded once
+    blessed_tags_set = load_blessed_tags("config/blessed_tags.txt")  # Loaded once
 
     # Process each bookmark as a subflow.
     # With the default SequentialTaskRunner, these will run one after another.
