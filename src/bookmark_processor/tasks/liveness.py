@@ -24,7 +24,7 @@ def attempt_get_request(url: str) -> Optional[Dict[str, Any]]:
                 "content": response.text,
                 "status_code": response.status_code,
             }
-    except httpx.RequestError:
+    except (httpx.RequestError, httpx.HTTPStatusError):
         return None
 
 
