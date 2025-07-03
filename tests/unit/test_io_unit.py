@@ -1,6 +1,8 @@
 import json
+
 import pytest
 from prefect.logging import disable_run_logger
+
 from bookmark_processor.tasks.io import load_bookmarks, save_results
 
 # --- Tests for load_bookmarks ---

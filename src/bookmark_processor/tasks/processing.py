@@ -1,12 +1,13 @@
+import json
 from datetime import timedelta
 from typing import List, Set
 
 import llm
-import json
 from bs4 import BeautifulSoup
 from prefect import task
 from prefect.tasks import task_input_hash
-from bookmark_processor.models import SuggestedTags, SuggestedSummary
+
+from bookmark_processor.models import SuggestedSummary, SuggestedTags
 
 CACHE_SETTINGS = dict(cache_key_fn=task_input_hash, cache_expiration=timedelta(days=7))
 

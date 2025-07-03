@@ -1,4 +1,5 @@
 import pytest
+
 from bookmark_processor.models import Bookmark
 
 

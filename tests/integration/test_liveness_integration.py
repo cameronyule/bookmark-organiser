@@ -1,6 +1,7 @@
+from unittest.mock import MagicMock
+
 import httpx
 import pytest
-from unittest.mock import MagicMock
 
 from bookmark_processor.tasks.liveness import (
     attempt_get_request,

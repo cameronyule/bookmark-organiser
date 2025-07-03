@@ -1,14 +1,14 @@
 from prefect.logging import disable_run_logger
+
 from bookmark_processor.main import (
+    _get_and_extract_content_source,
+    _lint_and_filter_tags,
+    _suggest_and_add_new_tags,
+    _summarize_and_update_extended,
     liveness_flow,
     process_bookmark_flow,
-    _get_and_extract_content_source,
-    _summarize_and_update_extended,
-    _suggest_and_add_new_tags,
-    _lint_and_filter_tags,
 )
 from bookmark_processor.models import LivenessResult
-
 
 # --- Tests for liveness_flow ---
 

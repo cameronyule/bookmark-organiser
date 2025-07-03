@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
+
 from bookmark_processor.main import process_all_bookmarks_flow
 from bookmark_processor.models import Bookmark, LivenessResult
-
 
 TEST_BOOKMARKS_CONTENT = """
 [

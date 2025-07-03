@@ -2,9 +2,9 @@ import pytest
 from prefect.logging import disable_run_logger
 
 from bookmark_processor.tasks.processing import (
-    load_blessed_tags,
     extract_main_content,
     lint_tags,
+    load_blessed_tags,
 )
 
 # --- Tests for load_blessed_tags ---

@@ -1,5 +1,6 @@
 import json
-from bookmark_processor.tasks.processing import summarize_content, suggest_tags
+
+from bookmark_processor.tasks.processing import suggest_tags, summarize_content
 
 
 def test_summarize_content_integration(mock_llm_model):
