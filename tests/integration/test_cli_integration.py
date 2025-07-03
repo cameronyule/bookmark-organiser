@@ -17,44 +17,10 @@ def prefect_test_fixture():
         yield
 
 
-@pytest.fixture(autouse=True)
-def mock_path_methods(mocker, fs):
-    """
-    Mocks pathlib.Path.exists, Path.is_file, and Path.resolve
-    to work with pyfakefs for Typer's path validation.
-    """
-    original_exists = Path.exists
-    original_is_file = Path.is_file
-    original_resolve = Path.resolve
-
-    def fake_exists(self):
-        if fs.is_fake_path(self):
-            return fs.exists(self)
-        return original_exists(self)
-
-    def fake_is_file(self):
-        if fs.is_fake_path(self):
-            return fs.is_file(self)
-        return original_is_file(self)
-
-    def fake_resolve(self, strict=False):
-        # For fake paths, just return the path itself as an absolute path
-        # or handle relative paths appropriately within the fake filesystem context.
-        # For simplicity, we'll just return the absolute version of the path.
-        if fs.is_fake_path(self):
-            return (
-                Path(fs.path_separator).joinpath(self.relative_to(self.anchor))
-                if self.is_absolute()
-                else self.absolute()
-            )
-        return original_resolve(self, strict)
-
-    mocker.patch("pathlib.Path.exists", new=fake_exists)
-    mocker.patch("pathlib.Path.is_file", new=fake_is_file)
-    mocker.patch("pathlib.Path.resolve", new=fake_resolve)
+# The mock_path_methods fixture is removed as pyfakefs handles pathlib.Path patching automatically.
 
 
-def test_cli_run_success(tmp_path: Path, mocker, fs):
+def test_cli_run_success(tmp_path: Path, mocker, fs, capfd):
     """
     Tests that the CLI 'run' command successfully invokes the main flow
     and handles file paths correctly.
@@ -89,8 +55,10 @@ def test_cli_run_success(tmp_path: Path, mocker, fs):
         app,
         ["run", str(input_file_path), str(output_file_path)],
         catch_exceptions=False,  # Ensure exceptions are not caught by runner
-        mix_stderr=False,  # Ensure stderr is captured separately
     )
+
+    # Capture stdout and stderr
+    outerr = capfd.readouterr()
 
     # Assert
     assert result.exit_code == 0
@@ -98,13 +66,13 @@ def test_cli_run_success(tmp_path: Path, mocker, fs):
         str(input_file_path), str(output_file_path)
     )
     assert (
-        "Processing all bookmarks flow completed." in result.stdout
+        "Processing all bookmarks flow completed." in outerr.stdout
     )  # Check for a message from the flow if it were to run, or just general success.
     # Note: The actual output file won't be created by the mocked flow,
     # so we don't assert its existence here.
 
 
-def test_cli_run_input_file_not_found(tmp_path: Path, mocker):
+def test_cli_run_input_file_not_found(tmp_path: Path, mocker, capfd):
     """
     Tests that the CLI 'run' command exits with an error if the input file does not exist.
     """
@@ -121,22 +89,26 @@ def test_cli_run_input_file_not_found(tmp_path: Path, mocker):
         app,
         ["run", str(input_file_path), str(output_file_path)],
         catch_exceptions=False,  # Ensure exceptions are not caught by runner
-        mix_stderr=False,  # Ensure stderr is captured separately
     )
+
+    # Capture stdout and stderr
+    outerr = capfd.readouterr()
 
     # Assert
     assert result.exit_code != 0  # Should exit with an error
-    assert "Path 'non_existent_input.json' does not exist." in result.stderr
+    assert "Path 'non_existent_input.json' does not exist." in outerr.stderr
     mock_process_all_bookmarks_flow.assert_not_called()
 
 
-def test_cli_run_missing_arguments():
+def test_cli_run_missing_arguments(capfd):
     """
     Tests that the CLI 'run' command requires both input and output file paths.
     """
-    result = runner.invoke(
-        app, ["run"], mix_stderr=False
-    )  # Ensure stderr is captured separately
+    result = runner.invoke(app, ["run"])
+
+    # Capture stdout and stderr
+    outerr = capfd.readouterr()
+
     assert result.exit_code != 0
-    assert "Missing argument 'INPUT_FILE'." in result.stderr
-    assert "Missing argument 'OUTPUT_FILE'." in result.stderr
+    assert "Missing argument 'INPUT_FILE'." in outerr.stderr
+    assert "Missing argument 'OUTPUT_FILE'." in outerr.stderr

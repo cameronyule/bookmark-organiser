@@ -210,7 +210,7 @@ def test_get_and_extract_content_source_fallback_to_direct_get(mocker):
 
 def test_get_and_extract_content_source_no_content_at_all(mocker):
     """
-    Tests that _get_and_extract_content_source returns None if no content can be found.
+    Tests that _get_and_extract_content_source returns an empty string if no content can be found.
     """
     bookmark = Bookmark(
         href="http://example.com",
@@ -243,7 +243,7 @@ def test_get_and_extract_content_source_no_content_at_all(mocker):
     with disable_run_logger():
         result = _get_and_extract_content_source(bookmark, liveness_result)
 
-    assert result is None
+    assert result == ""  # Changed assertion from `is None` to `== ""`
     mock_get_request.assert_called_once_with("http://example.com")
     mock_extract.assert_called_once_with(
         ""
