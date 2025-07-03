@@ -17,7 +17,31 @@ def prefect_test_fixture():
         yield
 
 
-# The mock_path_methods fixture is removed as pyfakefs handles pathlib.Path patching automatically.
+@pytest.fixture(autouse=True)
+def mock_path_methods(mocker, fs):
+    """
+    Mocks pathlib.Path.exists, Path.is_file, and Path.resolve
+    to work with pyfakefs for Typer's path validation.
+    """
+    def fake_exists(self):
+        # Check if the path exists in the fake filesystem
+        return fs.exists(self)
+
+    def fake_is_file(self):
+        # Check if the path is a file in the fake filesystem
+        return fs.is_file(self)
+
+    def fake_resolve(self, strict=False):
+        # When pyfakefs is active, Path objects created via tmp_path
+        # are already "fake" and should resolve within the fake FS.
+        # This mock ensures that if Typer calls resolve, it gets a path
+        # that pyfakefs understands.
+        # For simplicity, we return the absolute path within the fake FS.
+        return self.absolute()
+
+    mocker.patch("pathlib.Path.exists", new=fake_exists)
+    mocker.patch("pathlib.Path.is_file", new=fake_is_file)
+    mocker.patch("pathlib.Path.resolve", new=fake_resolve)
 
 
 def test_cli_run_success(tmp_path: Path, mocker, fs, capfd):
@@ -56,7 +80,7 @@ def test_cli_run_success(tmp_path: Path, mocker, fs, capfd):
         ["run", str(input_file_path), str(output_file_path)],
         catch_exceptions=False,  # Ensure exceptions are not caught by runner
     )
-
+    
     # Capture stdout and stderr
     outerr = capfd.readouterr()
 
@@ -66,7 +90,7 @@ def test_cli_run_success(tmp_path: Path, mocker, fs, capfd):
         str(input_file_path), str(output_file_path)
     )
     assert (
-        "Processing all bookmarks flow completed." in outerr.stdout
+        "Processing all bookmarks flow completed." in outerr.out
     )  # Check for a message from the flow if it were to run, or just general success.
     # Note: The actual output file won't be created by the mocked flow,
     # so we don't assert its existence here.
@@ -96,7 +120,7 @@ def test_cli_run_input_file_not_found(tmp_path: Path, mocker, capfd):
 
     # Assert
     assert result.exit_code != 0  # Should exit with an error
-    assert "Path 'non_existent_input.json' does not exist." in outerr.stderr
+    assert "Path 'non_existent_input.json' does not exist." in outerr.err
     mock_process_all_bookmarks_flow.assert_not_called()
 
 
@@ -105,10 +129,10 @@ def test_cli_run_missing_arguments(capfd):
     Tests that the CLI 'run' command requires both input and output file paths.
     """
     result = runner.invoke(app, ["run"])
-
+    
     # Capture stdout and stderr
     outerr = capfd.readouterr()
 
     assert result.exit_code != 0
-    assert "Missing argument 'INPUT_FILE'." in outerr.stderr
-    assert "Missing argument 'OUTPUT_FILE'." in outerr.stderr
+    assert "Missing argument 'INPUT_FILE'." in outerr.err
+    assert "Missing argument 'OUTPUT_FILE'." in outerr.err
