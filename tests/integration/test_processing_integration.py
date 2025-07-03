@@ -1,5 +1,4 @@
 import json
-from unittest.mock import MagicMock
 from bookmark_processor.tasks.processing import summarize_content, suggest_tags
 
 
@@ -8,13 +7,13 @@ def test_summarize_content_integration(mocker):
     Tests that summarize_content formats the prompt correctly and returns the response.
     """
     # Arrange: Create a fake model and a fake response object
-    mock_response = MagicMock()
+    mock_response = mocker.MagicMock()
     # Simulate a realistic LLM output with structured JSON
     mock_response.text.return_value = json.dumps(
         {"summary": "This is a concise summary."}
     )
 
-    mock_model = MagicMock()
+    mock_model = mocker.MagicMock()
     mock_model.prompt.return_value = mock_response
 
     # Patch the get_llm_model function to return our fake model
@@ -43,13 +42,13 @@ def test_suggest_tags_integration(mocker):
     Tests that suggest_tags formats the prompt and processes the space-separated response.
     """
     # Arrange
-    mock_response = MagicMock()
+    mock_response = mocker.MagicMock()
     # Simulate a realistic LLM output with structured JSON
     mock_response.text.return_value = json.dumps(
         {"tags": ["python", "ai", "distributed-systems"]}
     )
 
-    mock_model = MagicMock()
+    mock_model = mocker.MagicMock()
     mock_model.prompt.return_value = mock_response
 
     mocker.patch(
