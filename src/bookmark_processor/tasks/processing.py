@@ -2,9 +2,11 @@ from datetime import timedelta
 from typing import List, Set
 
 import llm
+import json
 from bs4 import BeautifulSoup
 from prefect import task
 from prefect.tasks import task_input_hash
+from bookmark_processor.models import SuggestedTags, SuggestedSummary
 
 CACHE_SETTINGS = dict(cache_key_fn=task_input_hash, cache_expiration=timedelta(days=7))
 
@@ -81,7 +83,7 @@ def lint_tags(tags: List[str], blessed_tags: Set[str]) -> List[str]:
 
 def get_llm_model():
     """Gets the LLM model. Assumes `llm` is configured."""
-    return llm.get_model("mlx-community/Llama-3.2-3B-Instruct-4bit")
+    return llm.get_model("qwen3:8b")
 
 
 @task(**CACHE_SETTINGS)
@@ -90,14 +92,17 @@ def summarize_content(text: str) -> str:
     Call the LLM API (via llm library) with the text to generate a summary.
     """
     model = get_llm_model()
+
     prompt = (
         "Please summarize the following content in one or two concise sentences."
         "Do not output anything other than the summarisation."
         "\n\n"
         f"{text}"
     )
-    response = model.prompt(prompt)
-    return response.text()
+
+    response = model.prompt(prompt, schema=SuggestedSummary)
+    response_json = json.loads(response.text())
+    return response_json["summary"]
 
 
 @task(**CACHE_SETTINGS)
@@ -106,6 +111,7 @@ def suggest_tags(text: str) -> List[str]:
     Call the LLM API (via llm library) to suggest relevant tags.
     """
     model = get_llm_model()
+
     prompt = (
         "Based on the following text, suggest 3-5 relevant tags as a single "
         "space-separated line. Use lowercase and no numbers. Prefer single "
@@ -114,5 +120,7 @@ def suggest_tags(text: str) -> List[str]:
         "Example: python programming distributed-systems ai\n\n"
         f"{text}"
     )
-    response = model.prompt(prompt)
-    return response.text().strip().lower().split()
+
+    response = model.prompt(prompt, schema=SuggestedTags)
+    response_json = json.loads(response.text())
+    return response_json["tags"]

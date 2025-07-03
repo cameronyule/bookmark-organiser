@@ -33,3 +33,15 @@ class LivenessResult(BaseModel):
     method: Literal["GET", "HEADLESS", "NONE", "ERROR"]
     final_url: Optional[str] = None
     content: Optional[str] = None
+
+
+class SuggestedTags(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    tags: list[str]
+
+
+class SuggestedSummary(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    summary: str
