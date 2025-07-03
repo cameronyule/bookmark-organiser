@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -18,7 +18,9 @@ class Bookmark(BaseModel):
 
     @field_validator("tags", mode="before")
     @classmethod
-    def split_tags(cls, v: str) -> List[str]:
+    def split_tags(cls, v: Optional[Union[str, List[str]]]) -> List[str]:
+        if v is None:
+            return []
         if isinstance(v, str):
             return v.split()
         return v

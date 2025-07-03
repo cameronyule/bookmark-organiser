@@ -245,7 +245,9 @@ def test_get_and_extract_content_source_no_content_at_all(mocker):
 
     assert result is None
     mock_get_request.assert_called_once_with("http://example.com")
-    mock_extract.assert_called_once_with("")
+    mock_extract.assert_called_once_with(
+        ""
+    )  # This assertion should now pass with the main.py change
 
 
 # --- Tests for _summarize_and_update_extended ---

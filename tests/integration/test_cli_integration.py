@@ -17,6 +17,43 @@ def prefect_test_fixture():
         yield
 
 
+@pytest.fixture(autouse=True)
+def mock_path_methods(mocker, fs):
+    """
+    Mocks pathlib.Path.exists, Path.is_file, and Path.resolve
+    to work with pyfakefs for Typer's path validation.
+    """
+    original_exists = Path.exists
+    original_is_file = Path.is_file
+    original_resolve = Path.resolve
+
+    def fake_exists(self):
+        if fs.is_fake_path(self):
+            return fs.exists(self)
+        return original_exists(self)
+
+    def fake_is_file(self):
+        if fs.is_fake_path(self):
+            return fs.is_file(self)
+        return original_is_file(self)
+
+    def fake_resolve(self, strict=False):
+        # For fake paths, just return the path itself as an absolute path
+        # or handle relative paths appropriately within the fake filesystem context.
+        # For simplicity, we'll just return the absolute version of the path.
+        if fs.is_fake_path(self):
+            return (
+                Path(fs.path_separator).joinpath(self.relative_to(self.anchor))
+                if self.is_absolute()
+                else self.absolute()
+            )
+        return original_resolve(self, strict)
+
+    mocker.patch("pathlib.Path.exists", new=fake_exists)
+    mocker.patch("pathlib.Path.is_file", new=fake_is_file)
+    mocker.patch("pathlib.Path.resolve", new=fake_resolve)
+
+
 def test_cli_run_success(tmp_path: Path, mocker, fs):
     """
     Tests that the CLI 'run' command successfully invokes the main flow
@@ -51,6 +88,8 @@ def test_cli_run_success(tmp_path: Path, mocker, fs):
     result = runner.invoke(
         app,
         ["run", str(input_file_path), str(output_file_path)],
+        catch_exceptions=False,  # Ensure exceptions are not caught by runner
+        mix_stderr=False,  # Ensure stderr is captured separately
     )
 
     # Assert
@@ -81,6 +120,8 @@ def test_cli_run_input_file_not_found(tmp_path: Path, mocker):
     result = runner.invoke(
         app,
         ["run", str(input_file_path), str(output_file_path)],
+        catch_exceptions=False,  # Ensure exceptions are not caught by runner
+        mix_stderr=False,  # Ensure stderr is captured separately
     )
 
     # Assert
@@ -93,7 +134,9 @@ def test_cli_run_missing_arguments():
     """
     Tests that the CLI 'run' command requires both input and output file paths.
     """
-    result = runner.invoke(app, ["run"])
+    result = runner.invoke(
+        app, ["run"], mix_stderr=False
+    )  # Ensure stderr is captured separately
     assert result.exit_code != 0
     assert "Missing argument 'INPUT_FILE'." in result.stderr
     assert "Missing argument 'OUTPUT_FILE'." in result.stderr

@@ -102,7 +102,7 @@ def _get_and_extract_content_source(
     if bookmark.extended:
         text_source = bookmark.extended
         logger.info("Using existing 'extended' description as text source.")
-    elif liveness_result.content:
+    elif liveness_result.content is not None:  # Changed condition
         logger.info("Extracting main content from fetched HTML via liveness check.")
         text_source = extract_main_content(liveness_result.content)
     else:
@@ -111,7 +111,7 @@ def _get_and_extract_content_source(
         )
         try:
             get_result = attempt_get_request(bookmark.href)
-            if get_result and get_result["content"]:
+            if get_result and get_result["content"] is not None:  # Changed condition
                 text_source = extract_main_content(get_result["content"])
                 logger.info(f"Direct GET successful for {bookmark.href}.")
             else:
