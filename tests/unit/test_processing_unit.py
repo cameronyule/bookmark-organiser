@@ -1,4 +1,6 @@
 import pytest
+from prefect.logging import disable_run_logger
+
 from bookmark_processor.tasks.processing import (
     load_blessed_tags,
     extract_main_content,
@@ -18,7 +20,8 @@ def test_load_blessed_tags_success(fs):
     fs.create_file(blessed_tags_path, contents="python\nprefect\nai\n")
 
     # Act
-    result = load_blessed_tags.fn(blessed_tags_path)
+    with disable_run_logger():
+        result = load_blessed_tags.fn(blessed_tags_path)
 
     # Assert
     assert result == {"python", "prefect", "ai"}
@@ -31,7 +34,8 @@ def test_load_blessed_tags_file_not_found(fs):
     # Arrange: The file is not created in the fake filesystem
 
     # Act
-    result = load_blessed_tags.fn("non_existent_file.txt")
+    with disable_run_logger():
+        result = load_blessed_tags.fn("non_existent_file.txt")
 
     # Assert: The function should gracefully return an empty set.
     assert result == set()
@@ -46,7 +50,8 @@ def test_load_blessed_tags_with_empty_lines_and_whitespace(fs):
     fs.create_file(blessed_tags_path, contents="  data-science  \n\n  mlops\n")
 
     # Act
-    result = load_blessed_tags.fn(blessed_tags_path)
+    with disable_run_logger():
+        result = load_blessed_tags.fn(blessed_tags_path)
 
     # Assert
     assert result == {"data-science", "mlops"}
@@ -108,7 +113,8 @@ def test_lint_tags_filters_unblessed_tags():
     blessed_tags = {"python", "ai", "prefect"}
 
     # Act
-    result = lint_tags.fn(input_tags, blessed_tags)
+    with disable_run_logger():
+        result = lint_tags.fn(input_tags, blessed_tags)
 
     # Assert: Only the blessed tags should be in the result.
     assert result == ["python", "ai"]
@@ -123,7 +129,8 @@ def test_lint_tags_with_no_blessed_tags():
     blessed_tags = set()
 
     # Act
-    result = lint_tags.fn(input_tags, blessed_tags)
+    with disable_run_logger():
+        result = lint_tags.fn(input_tags, blessed_tags)
 
     # Assert: The original list of tags should be returned untouched.
     assert result == ["python", "ai"]
@@ -138,7 +145,8 @@ def test_lint_tags_all_tags_are_blessed():
     blessed_tags = {"python", "ai", "prefect"}
 
     # Act
-    result = lint_tags.fn(input_tags, blessed_tags)
+    with disable_run_logger():
+        result = lint_tags.fn(input_tags, blessed_tags)
 
     # Assert
     assert result == ["python", "ai"]
