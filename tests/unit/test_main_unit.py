@@ -157,7 +157,7 @@ def test_get_and_extract_content_source_fallback_to_direct_get(mocker, basic_boo
         "bookmark_processor.main.attempt_get_request",
         return_value={
             "content": "<html>Direct GET content</html>",
-            "final_url": "http://example.com",
+            "final_url": bookmark.href,  # Use bookmark.href for consistency
             "status_code": 200,
         },
     )
@@ -166,7 +166,7 @@ def test_get_and_extract_content_source_fallback_to_direct_get(mocker, basic_boo
         result = _get_and_extract_content_source(bookmark, liveness_result)
 
     assert result == "Content from direct GET"
-    mock_get_request.assert_called_once_with("http://example.com")
+    mock_get_request.assert_called_once_with(bookmark.href)  # Changed assertion
     mock_extract.assert_called_once_with("<html>Direct GET content</html>")
 
 
@@ -188,7 +188,7 @@ def test_get_and_extract_content_source_no_content_at_all(mocker, basic_bookmark
         "bookmark_processor.main.attempt_get_request",
         return_value={
             "content": "",
-            "final_url": "http://example.com",
+            "final_url": bookmark.href,  # Use bookmark.href for consistency
             "status_code": 200,
         },  # Simulate empty content from direct GET
     )
@@ -197,7 +197,7 @@ def test_get_and_extract_content_source_no_content_at_all(mocker, basic_bookmark
         result = _get_and_extract_content_source(bookmark, liveness_result)
 
     assert result == ""
-    mock_get_request.assert_called_once_with("http://example.com")
+    mock_get_request.assert_called_once_with(bookmark.href)  # Changed assertion
     mock_extract.assert_called_once_with("")
 
 
