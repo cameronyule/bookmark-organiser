@@ -1,5 +1,3 @@
-import pytest
-from prefect.testing.utilities import prefect_test_harness
 from prefect.logging import disable_run_logger
 from bookmark_processor.main import (
     liveness_flow,
@@ -9,16 +7,7 @@ from bookmark_processor.main import (
     _suggest_and_add_new_tags,
     _lint_and_filter_tags,
 )
-from bookmark_processor.models import Bookmark, LivenessResult
-
-
-@pytest.fixture(autouse=True, scope="module")
-def prefect_test_fixture():
-    """
-    Fixture to run tests within a Prefect test harness.
-    """
-    with prefect_test_harness():
-        yield
+from bookmark_processor.models import LivenessResult
 
 
 # --- Tests for liveness_flow ---
@@ -106,21 +95,12 @@ def test_liveness_flow_all_checks_fail(mocker):
 # --- Tests for _get_and_extract_content_source ---
 
 
-def test_get_and_extract_content_source_from_extended():
+def test_get_and_extract_content_source_from_extended(basic_bookmark):
     """
     Tests that _get_and_extract_content_source uses bookmark.extended if available.
     """
-    bookmark = Bookmark(
-        href="http://example.com",
-        description="Test",
-        extended="Existing extended content.",
-        meta="",
-        hash="",
-        time="",
-        shared="",
-        toread="",
-        tags=[],
-    )
+    bookmark = basic_bookmark
+    bookmark.extended = "Existing extended content."
     liveness_result = LivenessResult(
         url="http://example.com", is_live=True, method="GET", content="<html></html>"
     )
@@ -131,22 +111,13 @@ def test_get_and_extract_content_source_from_extended():
     assert result == "Existing extended content."
 
 
-def test_get_and_extract_content_source_from_liveness_result(mocker):
+def test_get_and_extract_content_source_from_liveness_result(mocker, basic_bookmark):
     """
     Tests that _get_and_extract_content_source uses liveness_result.content
     and calls extract_main_content if bookmark.extended is empty.
     """
-    bookmark = Bookmark(
-        href="http://example.com",
-        description="Test",
-        extended="",
-        meta="",
-        hash="",
-        time="",
-        shared="",
-        toread="",
-        tags=[],
-    )
+    bookmark = basic_bookmark
+    bookmark.extended = ""
     liveness_result = LivenessResult(
         url="http://example.com",
         is_live=True,
@@ -167,22 +138,13 @@ def test_get_and_extract_content_source_from_liveness_result(mocker):
     mock_get_request.assert_not_called()
 
 
-def test_get_and_extract_content_source_fallback_to_direct_get(mocker):
+def test_get_and_extract_content_source_fallback_to_direct_get(mocker, basic_bookmark):
     """
     Tests that _get_and_extract_content_source falls back to direct GET
     if both bookmark.extended and liveness_result.content are empty.
     """
-    bookmark = Bookmark(
-        href="http://example.com",
-        description="Test",
-        extended="",
-        meta="",
-        hash="",
-        time="",
-        shared="",
-        toread="",
-        tags=[],
-    )
+    bookmark = basic_bookmark
+    bookmark.extended = ""
     liveness_result = LivenessResult(
         url="http://example.com", is_live=True, method="GET", content=None
     )
@@ -208,21 +170,12 @@ def test_get_and_extract_content_source_fallback_to_direct_get(mocker):
     mock_extract.assert_called_once_with("<html>Direct GET content</html>")
 
 
-def test_get_and_extract_content_source_no_content_at_all(mocker):
+def test_get_and_extract_content_source_no_content_at_all(mocker, basic_bookmark):
     """
     Tests that _get_and_extract_content_source returns an empty string if no content can be found.
     """
-    bookmark = Bookmark(
-        href="http://example.com",
-        description="Test",
-        extended="",
-        meta="",
-        hash="",
-        time="",
-        shared="",
-        toread="",
-        tags=[],
-    )
+    bookmark = basic_bookmark
+    bookmark.extended = ""
     liveness_result = LivenessResult(
         url="http://example.com", is_live=True, method="GET", content=None
     )
@@ -243,32 +196,21 @@ def test_get_and_extract_content_source_no_content_at_all(mocker):
     with disable_run_logger():
         result = _get_and_extract_content_source(bookmark, liveness_result)
 
-    assert result == ""  # Changed assertion from `is None` to `== ""`
+    assert result == ""
     mock_get_request.assert_called_once_with("http://example.com")
-    mock_extract.assert_called_once_with(
-        ""
-    )  # This assertion should now pass with the main.py change
+    mock_extract.assert_called_once_with("")
 
 
 # --- Tests for _summarize_and_update_extended ---
 
 
-def test_summarize_and_update_extended_summarizes_when_empty(mocker):
+def test_summarize_and_update_extended_summarizes_when_empty(mocker, basic_bookmark):
     """
     Tests that _summarize_and_update_extended calls summarize_content
     and updates bookmark.extended if it's empty.
     """
-    bookmark = Bookmark(
-        href="http://example.com",
-        description="Test",
-        extended="",
-        meta="",
-        hash="",
-        time="",
-        shared="",
-        toread="",
-        tags=[],
-    )
+    bookmark = basic_bookmark
+    bookmark.extended = ""
     text_source = "Long text to summarize."
     mock_summarize = mocker.patch(
         "bookmark_processor.main.summarize_content", return_value="A short summary."
@@ -281,22 +223,15 @@ def test_summarize_and_update_extended_summarizes_when_empty(mocker):
     mock_summarize.assert_called_once_with(text_source)
 
 
-def test_summarize_and_update_extended_does_not_summarize_when_not_empty(mocker):
+def test_summarize_and_update_extended_does_not_summarize_when_not_empty(
+    mocker, basic_bookmark
+):
     """
     Tests that _summarize_and_update_extended does not call summarize_content
     if bookmark.extended already has content.
     """
-    bookmark = Bookmark(
-        href="http://example.com",
-        description="Test",
-        extended="Already has content.",
-        meta="",
-        hash="",
-        time="",
-        shared="",
-        toread="",
-        tags=[],
-    )
+    bookmark = basic_bookmark
+    bookmark.extended = "Already has content."
     text_source = "Long text to summarize."
     mock_summarize = mocker.patch("bookmark_processor.main.summarize_content")
 
@@ -307,22 +242,13 @@ def test_summarize_and_update_extended_does_not_summarize_when_not_empty(mocker)
     mock_summarize.assert_not_called()
 
 
-def test_summarize_and_update_extended_no_text_source(mocker):
+def test_summarize_and_update_extended_no_text_source(mocker, basic_bookmark):
     """
     Tests that _summarize_and_update_extended does not call summarize_content
     if text_source is None.
     """
-    bookmark = Bookmark(
-        href="http://example.com",
-        description="Test",
-        extended="",
-        meta="",
-        hash="",
-        time="",
-        shared="",
-        toread="",
-        tags=[],
-    )
+    bookmark = basic_bookmark
+    bookmark.extended = ""
     text_source = None
     mock_summarize = mocker.patch("bookmark_processor.main.summarize_content")
 
@@ -336,21 +262,12 @@ def test_summarize_and_update_extended_no_text_source(mocker):
 # --- Tests for _suggest_and_add_new_tags ---
 
 
-def test_suggest_and_add_new_tags_adds_tags(mocker):
+def test_suggest_and_add_new_tags_adds_tags(mocker, basic_bookmark):
     """
     Tests that _suggest_and_add_new_tags calls suggest_tags and adds new tags.
     """
-    bookmark = Bookmark(
-        href="http://example.com",
-        description="Test",
-        extended="",
-        meta="",
-        hash="",
-        time="",
-        shared="",
-        toread="",
-        tags=["existing"],
-    )
+    bookmark = basic_bookmark
+    bookmark.tags = ["existing"]
     text_source = "Content for tags."
     mock_suggest_tags = mocker.patch(
         "bookmark_processor.main.suggest_tags", return_value=["new-tag", "another-tag"]
@@ -363,21 +280,12 @@ def test_suggest_and_add_new_tags_adds_tags(mocker):
     mock_suggest_tags.assert_called_once_with(text_source)
 
 
-def test_suggest_and_add_new_tags_no_text_source(mocker):
+def test_suggest_and_add_new_tags_no_text_source(mocker, basic_bookmark):
     """
     Tests that _suggest_and_add_new_tags does not call suggest_tags if text_source is None.
     """
-    bookmark = Bookmark(
-        href="http://example.com",
-        description="Test",
-        extended="",
-        meta="",
-        hash="",
-        time="",
-        shared="",
-        toread="",
-        tags=["existing"],
-    )
+    bookmark = basic_bookmark
+    bookmark.tags = ["existing"]
     text_source = None
     mock_suggest_tags = mocker.patch("bookmark_processor.main.suggest_tags")
 
@@ -391,21 +299,12 @@ def test_suggest_and_add_new_tags_no_text_source(mocker):
 # --- Tests for _lint_and_filter_tags ---
 
 
-def test_lint_and_filter_tags_removes_unblessed(mocker):
+def test_lint_and_filter_tags_removes_unblessed(mocker, basic_bookmark):
     """
     Tests that _lint_and_filter_tags calls lint_tags and updates bookmark.tags.
     """
-    bookmark = Bookmark(
-        href="http://example.com",
-        description="Test",
-        extended="",
-        meta="",
-        hash="",
-        time="",
-        shared="",
-        toread="",
-        tags=["python", "gossip", "ai"],
-    )
+    bookmark = basic_bookmark
+    bookmark.tags = ["python", "gossip", "ai"]
     blessed_tags_set = {"python", "ai", "prefect"}
     mock_lint_tags = mocker.patch(
         "bookmark_processor.main.lint_tags", return_value=["python", "ai"]
@@ -421,22 +320,14 @@ def test_lint_and_filter_tags_removes_unblessed(mocker):
 # --- Tests for process_bookmark_flow ---
 
 
-def test_process_bookmark_flow_not_live(mocker):
+def test_process_bookmark_flow_not_live(mocker, basic_bookmark):
     """
     Tests that process_bookmark_flow correctly handles a non-live bookmark:
     tags it with 'not-live' and skips content processing.
     """
-    bookmark = Bookmark(
-        href="http://example.com/dead",
-        description="Dead Link",
-        extended="",
-        meta="",
-        hash="",
-        time="",
-        shared="",
-        toread="",
-        tags=["old"],
-    )
+    bookmark = basic_bookmark
+    bookmark.href = "http://example.com/dead"
+    bookmark.tags = ["old"]
     blessed_tags_set = {"old", "not-live"}
 
     # Mock liveness_flow to return a non-live result
@@ -478,22 +369,13 @@ def test_process_bookmark_flow_not_live(mocker):
     mock_lint_tags.assert_called_once()  # lint_tags should still be called
 
 
-def test_process_bookmark_flow_redirect_updates_href(mocker):
+def test_process_bookmark_flow_redirect_updates_href(mocker, basic_bookmark):
     """
     Tests that process_bookmark_flow updates bookmark.href if liveness check
     results in a redirect (final_url is different).
     """
-    bookmark = Bookmark(
-        href="http://example.com/old",
-        description="Redirected Link",
-        extended="",
-        meta="",
-        hash="",
-        time="",
-        shared="",
-        toread="",
-        tags=[],
-    )
+    bookmark = basic_bookmark
+    bookmark.href = "http://example.com/old"
     blessed_tags_set = set()
 
     # Mock liveness_flow to return a live result with a redirect

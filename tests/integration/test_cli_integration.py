@@ -1,16 +1,8 @@
-import pytest
 from pathlib import Path
 from typer.testing import CliRunner
-from prefect.testing.utilities import prefect_test_harness
 from bookmark_processor.main import app
 
 runner = CliRunner()
-
-
-@pytest.fixture(autouse=True, scope="module")
-def prefect_test_fixture():
-    with prefect_test_harness():
-        yield
 
 
 def test_cli_run_success(tmp_path: Path, mocker, fs):

@@ -2,7 +2,6 @@ import json
 import pytest
 from prefect.logging import disable_run_logger
 from bookmark_processor.tasks.io import load_bookmarks, save_results
-from bookmark_processor.models import Bookmark
 
 # --- Tests for load_bookmarks ---
 
@@ -50,32 +49,25 @@ def test_load_bookmarks_malformed_json(fs):
 
 
 @pytest.fixture
-def sample_bookmarks():
+def sample_bookmarks(basic_bookmark):
     """Provides a list of Bookmark objects for testing save_results."""
-    return [
-        Bookmark(
-            href="http://example.com/page1",
-            description="Example Page One",
-            extended="A concise summary.",
-            meta="e6a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7",
-            hash="a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
-            time="2023-01-01T10:00:00Z",
-            shared="yes",
-            toread="no",
-            tags=["tech", "programming"],
-        ),
-        Bookmark(
-            href="http://example.com/page2",
-            description="Example Page Two",
-            extended="",
-            meta="f1e2d3c4b5a69876543210fedcba9876",
-            hash="b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7",
-            time="2023-01-02T11:00:00Z",
-            shared="no",
-            toread="yes",
-            tags=["science"],
-        ),
-    ]
+    bookmark1 = basic_bookmark.model_copy(
+        update={
+            "href": "http://example.com/page1",
+            "description": "Example Page One",
+            "extended": "A concise summary.",
+            "tags": ["tech", "programming"],
+        }
+    )
+    bookmark2 = basic_bookmark.model_copy(
+        update={
+            "href": "http://example.com/page2",
+            "description": "Example Page Two",
+            "extended": "",
+            "tags": ["science"],
+        }
+    )
+    return [bookmark1, bookmark2]
 
 
 def test_save_results_success(fs, sample_bookmarks):

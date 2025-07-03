@@ -2,23 +2,15 @@ import json
 from bookmark_processor.tasks.processing import summarize_content, suggest_tags
 
 
-def test_summarize_content_integration(mocker):
+def test_summarize_content_integration(mock_llm_model):
     """
     Tests that summarize_content formats the prompt correctly and returns the response.
     """
-    # Arrange: Create a fake model and a fake response object
-    mock_response = mocker.MagicMock()
+    # Arrange: Use the mock_llm_model fixture
+    mock_model, mock_response = mock_llm_model
     # Simulate a realistic LLM output with structured JSON
     mock_response.text.return_value = json.dumps(
         {"summary": "This is a concise summary."}
-    )
-
-    mock_model = mocker.MagicMock()
-    mock_model.prompt.return_value = mock_response
-
-    # Patch the get_llm_model function to return our fake model
-    mocker.patch(
-        "bookmark_processor.tasks.processing.get_llm_model", return_value=mock_model
     )
 
     input_text = "This is a very long piece of text that needs to be summarized."
@@ -37,22 +29,15 @@ def test_summarize_content_integration(mocker):
     assert input_text in prompt_text
 
 
-def test_suggest_tags_integration(mocker):
+def test_suggest_tags_integration(mock_llm_model):
     """
     Tests that suggest_tags formats the prompt and processes the space-separated response.
     """
-    # Arrange
-    mock_response = mocker.MagicMock()
+    # Arrange: Use the mock_llm_model fixture
+    mock_model, mock_response = mock_llm_model
     # Simulate a realistic LLM output with structured JSON
     mock_response.text.return_value = json.dumps(
         {"tags": ["python", "ai", "distributed-systems"]}
-    )
-
-    mock_model = mocker.MagicMock()
-    mock_model.prompt.return_value = mock_response
-
-    mocker.patch(
-        "bookmark_processor.tasks.processing.get_llm_model", return_value=mock_model
     )
 
     input_text = "Some text about AI and Python."

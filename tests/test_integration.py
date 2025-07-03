@@ -1,9 +1,8 @@
 import json
 from pathlib import Path
-import pytest
-from prefect.testing.utilities import prefect_test_harness
 from bookmark_processor.main import process_all_bookmarks_flow
 from bookmark_processor.models import Bookmark, LivenessResult
+
 
 TEST_BOOKMARKS_CONTENT = """
 [
@@ -31,16 +30,6 @@ TEST_BOOKMARKS_CONTENT = """
     }
 ]
 """
-
-
-@pytest.fixture(autouse=True, scope="session")
-def prefect_test_fixture():
-    """
-    Fixture to run tests within a Prefect test harness, providing an isolated
-    temporary local SQLite database for Prefect operations.
-    """
-    with prefect_test_harness():
-        yield
 
 
 def test_process_all_bookmarks_flow_integration(tmp_path: Path, mocker):
