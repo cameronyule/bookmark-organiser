@@ -2,7 +2,7 @@
 
 The plan is to separate tests into two categories: Unit Tests and Integration Tests. This separation ensures that we can test different aspects of the code effectively.
 
-Unit Tests: These will form the majority of our tests. They will test each function (task) in complete isolation. All external dependencies—such as the filesystem (open), the LLM library (llm), and even the Prefect logger—will be "mocked" or faked.
+Unit Tests: These will form the majority of our tests. They will test each function (task) in complete isolation. All external dependencies—such as the filesystem (open) and the LLM library (llm)—will be "mocked" or faked.
 
 Rationale: Unit tests are fast, deterministic, and reliable. By isolating a function, we can verify its internal logic without worrying about external systems. If a unit test fails, we know the bug is within that specific function, which makes debugging much easier.
 
@@ -30,8 +30,9 @@ A standard and clean way to organize your tests is as follows:
 
 ```
 your_project/
-├── my_prefect_flows/
-│   └── tasks.py        # The file you provided
+├── src/bookmark_processor/
+│   └── tasks/
+│       └── processing.py # The file you provided
 ├── config/
 │   └── blessed_tags.txt
 └── tests/
@@ -39,10 +40,10 @@ your_project/
     ├── conftest.py       # Optional: for shared fixtures
     ├── unit/
     │   ├── __init__.py
-    │   └── test_tasks_unit.py
+    │   └── test_processing_unit.py
     └── integration/
         ├── __init__.py
-        └── test_tasks_integration.py
+        └── test_processing_integration.py
 ```
 
 ## Detailed Testing Plan & Examples
@@ -55,10 +56,10 @@ This function's main dependency is the filesystem. We will use pyfakefs to creat
 
 Rationale: Using pyfakefs is superior to mocking the built-in open function because it correctly simulates a real filesystem environment. This allows us to test file paths, FileNotFoundError, and file content in a very realistic way without writing/deleting actual files on disk.
 
-tests/unit/test_tasks_unit.py
+tests/unit/test_processing_unit.py
 
 ```python
-from my_prefect_flows.tasks import load_blessed_tags
+from bookmark_processor.tasks.processing import load_blessed_tags
 
 # Using the 'fs' fixture provided by pyfakefs
 def test_load_blessed_tags_success(fs):
@@ -108,11 +109,11 @@ This is a pure function that depends only on its input and BeautifulSoup. No moc
 
 Rationale: We want to test the fallback logic: <article> -> <main> -> <body>. We also need to confirm that boilerplate tags (<nav>, <script>, etc.) are removed.
 
-tests/unit/test_tasks_unit.py
+tests/unit/test_processing_unit.py
 
 ```python
 import pytest
-from my_prefect_flows.tasks import extract_main_content
+from bookmark_processor.tasks.processing import extract_main_content
 
 @pytest.mark.parametrize(
     "html_input, expected_output",
@@ -159,10 +160,10 @@ def test_extract_main_content(html_input, expected_output):
 
 This is another pure function. We need to test its filtering logic.
 
-tests/unit/test_tasks_unit.py
+tests/unit/test_processing_unit.py
 
 ```python
-from my_prefect_flows.tasks import lint_tags
+from bookmark_processor.tasks.processing import lint_tags
 
 def test_lint_tags_filters_unblessed_tags():
     """
@@ -219,11 +220,12 @@ Builds the correct prompt string.
 
 Processes the library's response.
 
-tests/integration/test_tasks_integration.py
+tests/integration/test_processing_integration.py
 
 ```python
+import json
 from unittest.mock import MagicMock
-from my_prefect_flows.tasks import summarize_content, suggest_tags
+from bookmark_processor.tasks.processing import summarize_content, suggest_tags
 
 def test_summarize_content_integration(mocker):
     """
@@ -231,13 +233,14 @@ def test_summarize_content_integration(mocker):
     """
     # Arrange: Create a fake model and a fake response object
     mock_response = MagicMock()
-    mock_response.text.return_value = "This is a concise summary."
+    # Simulate a realistic LLM output with structured JSON
+    mock_response.text.return_value = json.dumps({"summary": "This is a concise summary."})
 
     mock_model = MagicMock()
     mock_model.prompt.return_value = mock_response
 
     # Patch the get_llm_model function to return our fake model
-    mocker.patch("my_prefect_flows.tasks.get_llm_model", return_value=mock_model)
+    mocker.patch("bookmark_processor.tasks.processing.get_llm_model", return_value=mock_model)
 
     input_text = "This is a very long piece of text that needs to be summarized."
 
@@ -261,13 +264,13 @@ def test_suggest_tags_integration(mocker):
     """
     # Arrange
     mock_response = MagicMock()
-    # Simulate a realistic LLM output with extra space and mixed case
-    mock_response.text.return_value = "  python Ai distributed-systems "
+    # Simulate a realistic LLM output with structured JSON
+    mock_response.text.return_value = json.dumps({"tags": ["python", "ai", "distributed-systems"]})
 
     mock_model = MagicMock()
     mock_model.prompt.return_value = mock_response
 
-    mocker.patch("my_prefect_flows.tasks.get_llm_model", return_value=mock_model)
+    mocker.patch("bookmark_processor.tasks.processing.get_llm_model", return_value=mock_model)
 
     input_text = "Some text about AI and Python."
 
@@ -283,6 +286,3 @@ def test_suggest_tags_integration(mocker):
     prompt_text = call_args[0]
     assert "suggest 3-5 relevant tags" in prompt_text
     assert input_text in prompt_text
-```
-
-This plan provides a robust testing suite for your Prefect tasks, ensuring that each piece of logic is verified independently and that the integrations with external systems are behaving as expected.
