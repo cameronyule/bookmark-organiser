@@ -180,6 +180,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "pyfakefs" },
     { name = "pytest" },
     { name = "pytest-mock" },
 ]
@@ -200,6 +201,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "pyfakefs", specifier = "~=5.9.1" },
     { name = "pytest", specifier = "~=8.4.1" },
     { name = "pytest-mock", specifier = "~=3.14.1" },
 ]
@@ -1524,6 +1526,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/95/03/1fd98d5841cd7964a27d729ccf2199602fe05eb7a405c1462eb7277945ed/pyee-13.0.0.tar.gz", hash = "sha256:b391e3c5a434d1f5118a25615001dbc8f669cf410ab67d04c4d4e07c55481c37", size = 31250, upload-time = "2025-03-17T18:53:15.955Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9b/4d/b9add7c84060d4c1906abe9a7e5359f2a60f7a9a4f67268b2766673427d8/pyee-13.0.0-py3-none-any.whl", hash = "sha256:48195a3cddb3b1515ce0695ed76036b5ccc2ef3a9f963ff9f77aec0139845498", size = 15730, upload-time = "2025-03-17T18:53:14.532Z" },
+]
+
+[[package]]
+name = "pyfakefs"
+version = "5.9.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/73/89/cb396a7aef5c76013cb44efd778ba3d89953b1d64304bf2d684a1d4ae06a/pyfakefs-5.9.1.tar.gz", hash = "sha256:ca02a1441dc77d7512bebfe4224b32f2127e83c45672f5fe2c02c33d4284bc70", size = 230395, upload-time = "2025-06-23T19:54:59.85Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4c/64/353b1a119c688d06a0be07312a3bb17154b63f95ebf8f2da625be765bb20/pyfakefs-5.9.1-py3-none-any.whl", hash = "sha256:b3c1f391f1990112ff6b0642182e75f07a6d7fcd81cf1357277680bf6c9b8a84", size = 244717, upload-time = "2025-06-23T19:54:57.66Z" },
 ]
 
 [[package]]
