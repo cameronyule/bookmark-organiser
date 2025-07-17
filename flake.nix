@@ -36,6 +36,7 @@
 
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
+            ollama
             (python313.withPackages (
               ps:
                 with ps; [
