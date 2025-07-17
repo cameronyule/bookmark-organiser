@@ -66,7 +66,7 @@ def _perform_headless_check(url: str) -> Optional[LivenessResult]:
     return None
 
 
-@flow(name="Check URL Liveness")
+@task(name="Check URL Liveness")
 def liveness_flow(url: str) -> LivenessResult:
     """
     Checks the liveness of a given URL using a fallback chain: GET -> Headless.
