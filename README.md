@@ -9,6 +9,7 @@ It takes a [JSON export](https://pinboard.in/howto/#export) of bookmarks as inpu
 ``` shell
 nix develop
 uv run prefect server start --background
+uv run prefect config set PREFECT_API_URL=http://127.0.0.1:4200/api
 uv run bookmark-processor <input.json> <output.json>
 ```
 
