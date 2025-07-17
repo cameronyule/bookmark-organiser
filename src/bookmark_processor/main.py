@@ -171,6 +171,8 @@ def process_bookmark_flow(bookmark: Bookmark, blessed_tags_set: Set[str]) -> Boo
     if liveness_result.final_url and liveness_result.final_url != bookmark.href:
         logger.info(f"URL {bookmark.href} redirected to {liveness_result.final_url}")
         bookmark.href = liveness_result.final_url
+        # Append "data:redirected" tag for bookmarks that were redirected
+        bookmark.tags.append("data:redirected")
 
     if not liveness_result.is_live:
         logger.warning(
@@ -178,8 +180,8 @@ def process_bookmark_flow(bookmark: Bookmark, blessed_tags_set: Set[str]) -> Boo
         )
         # Even if not live, we still want to lint tags and save the bookmark
         _lint_and_filter_tags(bookmark, blessed_tags_set)  # Passed blessed_tags_set
-        # Append "not-live" tag for bookmarks that failed all liveness checks
-        bookmark.tags.append("not-live")
+        # Append "data:offline" tag for bookmarks that failed all liveness checks
+        bookmark.tags.append("data:offline")
         return bookmark
 
     # 2. Determine and extract text source for processing

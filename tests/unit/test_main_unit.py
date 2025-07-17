@@ -323,12 +323,12 @@ def test_lint_and_filter_tags_removes_unblessed(mocker, basic_bookmark):
 def test_process_bookmark_flow_not_live(mocker, basic_bookmark):
     """
     Tests that process_bookmark_flow correctly handles a non-live bookmark:
-    tags it with 'not-live' and skips content processing.
+    tags it with 'data:offline' and skips content processing.
     """
     bookmark = basic_bookmark
     bookmark.href = "http://example.com/dead"
     bookmark.tags = ["old"]
-    blessed_tags_set = {"old", "not-live"}
+    blessed_tags_set = {"old", "data:offline"}
 
     # Mock liveness_flow to return a non-live result
     mocker.patch(
@@ -360,7 +360,7 @@ def test_process_bookmark_flow_not_live(mocker, basic_bookmark):
         processed_bookmark = process_bookmark_flow(bookmark, blessed_tags_set)
 
     assert processed_bookmark.href == "http://example.com/dead"
-    assert "not-live" in processed_bookmark.tags
+    assert "data:offline" in processed_bookmark.tags
     assert "old" in processed_bookmark.tags  # Should still lint existing tags
     assert processed_bookmark.extended == ""  # Should not be summarized
     mock_get_and_extract.assert_not_called()
