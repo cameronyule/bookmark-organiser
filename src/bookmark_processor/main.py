@@ -179,22 +179,22 @@ def process_bookmark_flow(bookmark: Bookmark, blessed_tags_set: Set[str]) -> Boo
             f"Bookmark {bookmark.href} is not live. Skipping content processing."
         )
         # Even if not live, we still want to lint tags and save the bookmark
-        _lint_and_filter_tags(bookmark, blessed_tags_set)  # Passed blessed_tags_set
+        # _lint_and_filter_tags(bookmark, blessed_tags_set)  # Passed blessed_tags_set
         # Append "data:offline" tag for bookmarks that failed all liveness checks
         bookmark.tags.append("data:offline")
         return bookmark
 
     # 2. Determine and extract text source for processing
-    #text_source = _get_and_extract_content_source(bookmark, liveness_result)
+    # text_source = _get_and_extract_content_source(bookmark, liveness_result)
 
     # 3. Summarize Content
-    #_summarize_and_update_extended(bookmark, text_source)
+    # _summarize_and_update_extended(bookmark, text_source)
 
     # 4. Suggest and add new Tags
-    #_suggest_and_add_new_tags(bookmark, text_source)
+    # _suggest_and_add_new_tags(bookmark, text_source)
 
     # 5. Lint Tags
-    #_lint_and_filter_tags(bookmark, blessed_tags_set)
+    # _lint_and_filter_tags(bookmark, blessed_tags_set)
 
     logger.info(f"Finished processing bookmark: {bookmark.href}")
     return bookmark
@@ -215,10 +215,12 @@ def process_all_bookmarks_flow(bookmarks_filepath: str, output_filepath: str):
     blessed_tags_set = load_blessed_tags("config/blessed_tags.txt")
 
     # Process each bookmark as a subflow.
-    # With the default SequentialTaskRunner, these will run one after another.
-    results = [
-        process_bookmark_flow(b, blessed_tags_set) for b in bookmarks
-    ]  # Passed blessed_tags_set
+    # With ConcurrentTaskRunner, these will run concurrently.
+    futures = [
+        process_bookmark_flow.submit(bookmark, blessed_tags_set)
+        for bookmark in bookmarks
+    ]
+    results = [f.result() for f in futures]
     logger.info("All subflows completed.")
 
     logger.info(f"Saving {len(results)} processed bookmarks to {output_filepath}")
