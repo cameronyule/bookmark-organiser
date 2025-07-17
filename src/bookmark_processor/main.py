@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Optional, Set
 
 import typer
-from prefect import flow, get_run_logger
+from prefect import flow, get_run_logger, task
 
 from bookmark_processor.models import Bookmark, LivenessResult
 from bookmark_processor.tasks.io import load_bookmarks, save_results
@@ -156,7 +156,7 @@ def _lint_and_filter_tags(bookmark: Bookmark, blessed_tags_set: Set[str]) -> Non
         logger.info(f"Removed unblessed tags for {bookmark.href}: {list(removed_tags)}")
 
 
-@flow(name="Process Single Bookmark")
+@task(name="Process Single Bookmark")
 def process_bookmark_flow(bookmark: Bookmark, blessed_tags_set: Set[str]) -> Bookmark:
     """
     Processes a single bookmark: checks liveness, extracts content, summarizes, and suggests tags.
