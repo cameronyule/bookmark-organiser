@@ -3,6 +3,7 @@ from typing import Optional, Set
 
 import typer
 from prefect import flow, get_run_logger, task
+from prefect.task_runners import ConcurrentTaskRunner
 
 from bookmark_processor.models import Bookmark, LivenessResult
 from bookmark_processor.tasks.io import load_bookmarks, save_results
@@ -200,7 +201,10 @@ def process_bookmark_flow(bookmark: Bookmark, blessed_tags_set: Set[str]) -> Boo
     return bookmark
 
 
-@flow(name="Process All Bookmarks")
+@flow(
+    name="Process All Bookmarks",
+    task_runner=ConcurrentTaskRunner(max_workers=40),
+)
 def process_all_bookmarks_flow(bookmarks_filepath: str, output_filepath: str):
     """
     Orchestrates the entire bookmark processing pipeline.
