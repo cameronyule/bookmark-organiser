@@ -64,7 +64,7 @@ def test_attempt_headless_browser_success(mocker):
     mock_browser = mock_playwright_context.chromium.launch.return_value
     mock_page = mock_browser.new_page.return_value
     mock_response = MagicMock()
-    mock_response.status.return_value = 200
+    mock_response.status = 200
     mock_page.goto.return_value = mock_response
     mock_page.content.return_value = "<html>Success</html>"
     mock_page.url = "http://example.com/final"
