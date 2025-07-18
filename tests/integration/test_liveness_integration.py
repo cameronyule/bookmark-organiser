@@ -90,8 +90,8 @@ def test_attempt_headless_browser_handles_none_response(mocker):
 
     # Assert
     assert result == {
-        "final_url": "http://example.com/final",
         "content": "",
+        "final_url": "http://example.com/final",
         "status_code": None,
     }
     mock_browser.close.assert_called_once()
