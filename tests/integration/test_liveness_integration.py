@@ -78,7 +78,8 @@ def test_attempt_headless_browser_handles_none_response(mocker):
     )
     mock_playwright_context = mock_sync_playwright.return_value.__enter__.return_value
     mock_browser = mock_playwright_context.chromium.launch.return_value
-    mock_page = mock_browser.new_page.return_value
+    mock_browser_context = mock_browser.new_context.return_value
+    mock_page = mock_browser_context.new_page.return_value
 
     mock_page.goto.return_value = None
     mock_page.content.return_value = ""
@@ -93,4 +94,32 @@ def test_attempt_headless_browser_handles_none_response(mocker):
         "content": "",
         "status_code": None,
     }
+    mock_browser.close.assert_called_once()
+
+
+def test_attempt_headless_browser_uses_context(mocker):
+    """
+    Tests that attempt_headless_browser correctly uses and closes a BrowserContext.
+    """
+    # Arrange
+    mock_sync_playwright = mocker.patch(
+        "bookmark_processor.tasks.liveness.sync_playwright"
+    )
+    mock_playwright_context = mock_sync_playwright.return_value.__enter__.return_value
+    mock_browser = mock_playwright_context.chromium.launch.return_value
+    mock_context = mock_browser.new_context.return_value
+    mock_page = mock_context.new_page.return_value
+
+    mock_page.goto.return_value = mocker.MagicMock(
+        status=200, url="http://example.com/final"
+    )
+    mock_page.content.return_value = "<html>test content</html>"
+    mock_page.url = "http://example.com/final"
+
+    # Act
+    attempt_headless_browser.fn("http://example.com")
+
+    # Assert
+    mock_browser.new_context.assert_called_once()
+    mock_context.close.assert_called_once()
     mock_browser.close.assert_called_once()

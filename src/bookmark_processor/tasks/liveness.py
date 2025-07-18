@@ -37,7 +37,8 @@ def attempt_headless_browser(url: str) -> Optional[Dict[str, Any]]:
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
+            context = browser.new_context()
+            page = context.new_page()
             try:
                 response = page.goto(url, wait_until="domcontentloaded", timeout=60000)
                 content = page.content()
@@ -51,6 +52,7 @@ def attempt_headless_browser(url: str) -> Optional[Dict[str, Any]]:
                     # assume a status code.
                     status_code = 200 if content else None
             finally:
+                context.close()
                 browser.close()
             return {
                 "final_url": final_url,
