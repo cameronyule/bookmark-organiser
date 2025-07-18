@@ -168,10 +168,8 @@ def process_bookmark_flow(bookmark: Bookmark, blessed_tags_set: Set[str]) -> Boo
     # 1. Check URL Liveness
     liveness_result = liveness_flow(bookmark.href)
 
-    # Update bookmark href to final URL if redirect occurred
     if liveness_result.final_url and liveness_result.final_url != bookmark.href:
         logger.info(f"URL {bookmark.href} redirected to {liveness_result.final_url}")
-        bookmark.href = liveness_result.final_url
         # Append "data:redirected" tag for bookmarks that were redirected
         bookmark.tags.append("data:redirected")
 

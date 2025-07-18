@@ -367,39 +367,3 @@ def test_process_bookmark_flow_not_live(mocker, basic_bookmark):
     mock_summarize.assert_not_called()
     mock_suggest_tags.assert_not_called()
     mock_lint_tags.assert_called_once()  # lint_tags should still be called
-
-
-def test_process_bookmark_flow_redirect_updates_href(mocker, basic_bookmark):
-    """
-    Tests that process_bookmark_flow updates bookmark.href if liveness check
-    results in a redirect (final_url is different).
-    """
-    bookmark = basic_bookmark
-    bookmark.href = "http://example.com/old"
-    blessed_tags_set = set()
-
-    # Mock liveness_flow to return a live result with a redirect
-    mocker.patch(
-        "bookmark_processor.main.liveness_flow",
-        return_value=LivenessResult(
-            url="http://example.com/old",
-            is_live=True,
-            status_code=200,
-            method="GET",
-            final_url="http://example.com/new",  # Different final_url
-            content="<html>New content</html>",
-        ),
-    )
-    # Mock content processing tasks to allow flow to continue
-    mocker.patch(
-        "bookmark_processor.main._get_and_extract_content_source",
-        return_value="content",
-    )
-    mocker.patch("bookmark_processor.main._summarize_and_update_extended")
-    mocker.patch("bookmark_processor.main._suggest_and_add_new_tags")
-    mocker.patch("bookmark_processor.main._lint_and_filter_tags")
-
-    with disable_run_logger():
-        processed_bookmark = process_bookmark_flow(bookmark, blessed_tags_set)
-
-    assert processed_bookmark.href == "http://example.com/new"
