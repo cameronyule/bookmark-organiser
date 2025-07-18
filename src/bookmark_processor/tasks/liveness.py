@@ -36,7 +36,7 @@ def attempt_headless_browser(url: str) -> Optional[Dict[str, Any]]:
     """
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch()
+            browser = p.chromium.launch(headless=False)
             page = browser.new_page()
             try:
                 response = page.goto(url, wait_until="domcontentloaded", timeout=60000)
