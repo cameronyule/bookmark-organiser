@@ -42,7 +42,14 @@ def attempt_headless_browser(url: str) -> Optional[Dict[str, Any]]:
                 response = page.goto(url, wait_until="domcontentloaded", timeout=60000)
                 content = page.content()
                 final_url = page.url
-                status_code = response.status() if response else None
+                if response:
+                    status_code = response.status
+                else:
+                    # If no response, but we have content, it's likely a successful
+                    # client-side redirect (e.g. Cloudflare). Assume success.
+                    # If no content, it could be a 204 No Content, so we can't
+                    # assume a status code.
+                    status_code = 200 if content else None
             finally:
                 browser.close()
             return {
