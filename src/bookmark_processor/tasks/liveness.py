@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional
 
 import httpx
 from playwright.sync_api import sync_playwright
-from prefect import task
+from prefect import task, get_run_logger
 from prefect.tasks import task_input_hash
 
 CACHE_SETTINGS = dict(cache_key_fn=task_input_hash, cache_expiration=timedelta(days=7))
@@ -27,6 +27,13 @@ def attempt_get_request(url: str) -> Optional[Dict[str, Any]]:
     except (httpx.RequestError, httpx.HTTPStatusError):
         return None
 
+@task(**CACHE_SETTINGS)
+def handle_response(response):
+    logger = get_run_logger()
+    if 300 <= response.status < 400:
+        logger.info(f"Redirect: {response.status} from {response.url}")
+        location = response.headers.get('location', 'No location header')
+        logger.info(f"  -> Location: {location}")
 
 @task(retries=1, retry_delay_seconds=30, **CACHE_SETTINGS)
 def attempt_headless_browser(url: str) -> Optional[Dict[str, Any]]:
@@ -39,6 +46,7 @@ def attempt_headless_browser(url: str) -> Optional[Dict[str, Any]]:
             browser = p.chromium.launch(headless=True)
             context = browser.new_context()
             page = context.new_page()
+            page.on("response", handle_response)
             try:
                 response = page.goto(url, wait_until="domcontentloaded", timeout=60000)
                 content = page.content()
