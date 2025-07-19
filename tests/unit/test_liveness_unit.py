@@ -62,7 +62,8 @@ def test_attempt_headless_browser_success(mocker):
     )
     mock_playwright_context = mock_sync_playwright.return_value.__enter__.return_value
     mock_browser = mock_playwright_context.chromium.launch.return_value
-    mock_page = mock_browser.new_page.return_value
+    mock_browser_context = mock_browser.new_context.return_value
+    mock_page = mock_browser_context.new_page.return_value
     mock_response = MagicMock()
     mock_response.status = 200
     mock_page.goto.return_value = mock_response
@@ -94,7 +95,8 @@ def test_attempt_headless_browser_failure(mocker):
     )
     mock_playwright_context = mock_sync_playwright.return_value.__enter__.return_value
     mock_browser = mock_playwright_context.chromium.launch.return_value
-    mock_page = mock_browser.new_page.return_value
+    mock_browser_context = mock_browser.new_context.return_value
+    mock_page = mock_browser_context.new_page.return_value
     mock_page.goto.side_effect = Exception("mock error")
 
     # Act
