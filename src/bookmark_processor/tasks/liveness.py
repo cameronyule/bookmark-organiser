@@ -28,9 +28,8 @@ def attempt_get_request(url: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-@task(**CACHE_SETTINGS)
-def handle_response(response):
-    logger = get_run_logger()
+def handle_response(response, logger):
+    """Logs redirect responses encountered by Playwright."""
     if 300 <= response.status < 400:
         logger.info(f"Redirect: {response.status} from {response.url}")
         location = response.headers.get("location", "No location header")
@@ -43,12 +42,13 @@ def attempt_headless_browser(url: str) -> Optional[Dict[str, Any]]:
     Use playwright to load the page. Return a dict {"final_url": str, "content": str, "status_code": int}.
     Returns None if the request fails.
     """
+    logger = get_run_logger()
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             context = browser.new_context()
             page = context.new_page()
-            page.on("response", handle_response)
+            page.on("response", lambda response: handle_response(response, logger))
             try:
                 response = page.goto(url, wait_until="domcontentloaded", timeout=60000)
                 content = page.content()
