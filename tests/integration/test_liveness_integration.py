@@ -123,3 +123,32 @@ def test_attempt_headless_browser_uses_context(mocker):
     mock_browser.new_context.assert_called_once()
     mock_context.close.assert_called_once()
     mock_browser.close.assert_called_once()
+
+
+@pytest.mark.parametrize("status_code", [400, 404, 500, 503])
+def test_attempt_headless_browser_http_error_status(mocker, status_code):
+    """
+    Tests that attempt_headless_browser returns None for 4xx/5xx HTTP status codes.
+    """
+    # Arrange
+    mock_sync_playwright = mocker.patch(
+        "bookmark_processor.tasks.liveness.sync_playwright"
+    )
+    mock_playwright_context = mock_sync_playwright.return_value.__enter__.return_value
+    mock_browser = mock_playwright_context.chromium.launch.return_value
+    mock_browser_context = mock_browser.new_context.return_value
+    mock_page = mock_browser_context.new_page.return_value
+
+    mock_response = MagicMock()
+    mock_response.status = status_code
+    mock_page.goto.return_value = mock_response
+    mock_page.content.return_value = "<html>Error Page</html>"
+    mock_page.url = f"http://example.com/error/{status_code}"
+
+    # Act
+    result = attempt_headless_browser(f"http://example.com/test/{status_code}")
+
+    # Assert
+    assert result is None
+    mock_browser_context.close.assert_called_once()
+    mock_browser.close.assert_called_once()
