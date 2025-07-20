@@ -57,7 +57,7 @@ def attempt_headless_browser(url: str) -> Optional[Dict[str, Any]]:
                     status_code = response.status
                     # Treat 4xx or 5xx HTTP responses as unsuccessful, similar to GET requests
                     if 400 <= status_code < 600:
-                        get_run_logger().warning(
+                        logger.warning(
                             f"Headless browser detected HTTP error status {status_code} for {url}. Considering it unsuccessful."
                         )
                         return None
