@@ -9,6 +9,25 @@ from bookmark_processor.tasks.liveness import (
 )
 
 
+@pytest.fixture
+def mocked_playwright(mocker):
+    """Provides a mocked Playwright environment."""
+    mocker.patch("bookmark_processor.tasks.liveness.get_run_logger")
+    mock_sync_playwright = mocker.patch(
+        "bookmark_processor.tasks.liveness.sync_playwright"
+    )
+    mock_playwright_context = mock_sync_playwright.return_value.__enter__.return_value
+    mock_browser = mock_playwright_context.chromium.launch.return_value
+    mock_context = mock_browser.new_context.return_value
+    mock_page = mock_context.new_page.return_value
+
+    return {
+        "browser": mock_browser,
+        "context": mock_context,
+        "page": mock_page,
+    }
+
+
 @pytest.mark.parametrize(
     "status_code",
     [404, 500],
@@ -67,20 +86,14 @@ def test_attempt_get_request_handles_redirects(mocker):
     mock_client.get.assert_called_once_with(initial_url, timeout=20)
 
 
-def test_attempt_headless_browser_handles_none_response(mocker):
+def test_attempt_headless_browser_handles_none_response(mocked_playwright):
     """
     Tests that attempt_headless_browser handles a None response from page.goto,
     which can occur for 204 No Content responses.
     """
     # Arrange
-    mocker.patch("bookmark_processor.tasks.liveness.get_run_logger")
-    mock_sync_playwright = mocker.patch(
-        "bookmark_processor.tasks.liveness.sync_playwright"
-    )
-    mock_playwright_context = mock_sync_playwright.return_value.__enter__.return_value
-    mock_browser = mock_playwright_context.chromium.launch.return_value
-    mock_browser_context = mock_browser.new_context.return_value
-    mock_page = mock_browser_context.new_page.return_value
+    mock_browser = mocked_playwright["browser"]
+    mock_page = mocked_playwright["page"]
 
     mock_page.goto.return_value = None
     mock_page.content.return_value = ""
@@ -98,19 +111,14 @@ def test_attempt_headless_browser_handles_none_response(mocker):
     mock_browser.close.assert_called_once()
 
 
-def test_attempt_headless_browser_uses_context(mocker):
+def test_attempt_headless_browser_uses_context(mocked_playwright, mocker):
     """
     Tests that attempt_headless_browser correctly uses and closes a BrowserContext.
     """
     # Arrange
-    mocker.patch("bookmark_processor.tasks.liveness.get_run_logger")
-    mock_sync_playwright = mocker.patch(
-        "bookmark_processor.tasks.liveness.sync_playwright"
-    )
-    mock_playwright_context = mock_sync_playwright.return_value.__enter__.return_value
-    mock_browser = mock_playwright_context.chromium.launch.return_value
-    mock_context = mock_browser.new_context.return_value
-    mock_page = mock_context.new_page.return_value
+    mock_browser = mocked_playwright["browser"]
+    mock_context = mocked_playwright["context"]
+    mock_page = mocked_playwright["page"]
 
     mock_page.goto.return_value = mocker.MagicMock(
         status=200, url="http://example.com/final"
@@ -128,19 +136,14 @@ def test_attempt_headless_browser_uses_context(mocker):
 
 
 @pytest.mark.parametrize("status_code", [400, 404, 500, 503])
-def test_attempt_headless_browser_http_error_status(mocker, status_code):
+def test_attempt_headless_browser_http_error_status(mocked_playwright, status_code):
     """
     Tests that attempt_headless_browser returns None for 4xx/5xx HTTP status codes.
     """
     # Arrange
-    mocker.patch("bookmark_processor.tasks.liveness.get_run_logger")
-    mock_sync_playwright = mocker.patch(
-        "bookmark_processor.tasks.liveness.sync_playwright"
-    )
-    mock_playwright_context = mock_sync_playwright.return_value.__enter__.return_value
-    mock_browser = mock_playwright_context.chromium.launch.return_value
-    mock_browser_context = mock_browser.new_context.return_value
-    mock_page = mock_browser_context.new_page.return_value
+    mock_browser = mocked_playwright["browser"]
+    mock_context = mocked_playwright["context"]
+    mock_page = mocked_playwright["page"]
 
     mock_response = MagicMock()
     mock_response.status = status_code
@@ -153,5 +156,5 @@ def test_attempt_headless_browser_http_error_status(mocker, status_code):
 
     # Assert
     assert result is None
-    mock_browser_context.close.assert_called_once()
+    mock_context.close.assert_called_once()
     mock_browser.close.assert_called_once()
