@@ -73,6 +73,7 @@ def test_attempt_headless_browser_handles_none_response(mocker):
     which can occur for 204 No Content responses.
     """
     # Arrange
+    mocker.patch("bookmark_processor.tasks.liveness.get_run_logger")
     mock_sync_playwright = mocker.patch(
         "bookmark_processor.tasks.liveness.sync_playwright"
     )
@@ -102,6 +103,7 @@ def test_attempt_headless_browser_uses_context(mocker):
     Tests that attempt_headless_browser correctly uses and closes a BrowserContext.
     """
     # Arrange
+    mocker.patch("bookmark_processor.tasks.liveness.get_run_logger")
     mock_sync_playwright = mocker.patch(
         "bookmark_processor.tasks.liveness.sync_playwright"
     )
@@ -131,6 +133,7 @@ def test_attempt_headless_browser_http_error_status(mocker, status_code):
     Tests that attempt_headless_browser returns None for 4xx/5xx HTTP status codes.
     """
     # Arrange
+    mocker.patch("bookmark_processor.tasks.liveness.get_run_logger")
     mock_sync_playwright = mocker.patch(
         "bookmark_processor.tasks.liveness.sync_playwright"
     )
@@ -146,7 +149,7 @@ def test_attempt_headless_browser_http_error_status(mocker, status_code):
     mock_page.url = f"http://example.com/error/{status_code}"
 
     # Act
-    result = attempt_headless_browser(f"http://example.com/test/{status_code}")
+    result = attempt_headless_browser.fn(f"http://example.com/test/{status_code}")
 
     # Assert
     assert result is None

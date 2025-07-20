@@ -57,6 +57,7 @@ def test_attempt_headless_browser_success(mocker):
     Tests that attempt_headless_browser returns a dictionary on a successful page load.
     """
     # Arrange
+    mocker.patch("bookmark_processor.tasks.liveness.get_run_logger")
     mock_sync_playwright = mocker.patch(
         "bookmark_processor.tasks.liveness.sync_playwright"
     )
@@ -90,6 +91,7 @@ def test_attempt_headless_browser_failure(mocker):
     Tests that attempt_headless_browser returns None when an exception occurs.
     """
     # Arrange
+    mocker.patch("bookmark_processor.tasks.liveness.get_run_logger")
     mock_sync_playwright = mocker.patch(
         "bookmark_processor.tasks.liveness.sync_playwright"
     )
